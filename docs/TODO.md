@@ -11,3 +11,5 @@
 5. ) It would be nice to have a way to automatically insert | or some other delimiter to make tables.
 
 6. ) It would be nice to have a way to alter previous cprintf() specifiers or update them.
+
+7. ) Bunch of loops can be changed to do while.
