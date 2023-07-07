@@ -28,15 +28,15 @@ Libjustify offers 4 new [Functions](#functions) that are used with the same synt
    
 | Standard Function | Equivalent | Description |   
 |----------|-------------|--------------|   
-| `printf()` | `cprintf()` | Writes formatted tabulate data to the standard output stream (`stdout`). |   
+| `printf()` | `cprintf()` | Writes formatted tabulated data to the standard output stream (`stdout`). |   
 | `fprintf()` | `cfprintf()` | Writes formatted tabulated data to the specified output stream. |   
 | `vprintf()` | `cvprintf()` | Accepts a `va_list` argument instead of a variable number of arguments. |   
 | `vfprintf()` | `cvfprintf()` | Accepts a `va_list` argument and writes formatted tabulate output to the specified output stream. |   
    
    
-These the format strings and store them as ([**Atoms **](#atoms)). ==To finally print and free all the data you must call `cflush()`==. Format strings are tabulated and justified to the width of the longest conversion specifier/text in that row.    
+These format strings and store them as ([**Atoms **](#atoms)). ==To finally print and free all the data you must call `cflush()`==. Format strings are tabulated and justified to the width of the longest conversion specifier/text in that row.    
    
-==**NOTE: `cflush()` should always be called before program termination**==. Calls to `cflush()` will reset how future formatted data is tabulated.   
+==**NOTE: `cflush()` should always be called before program termination**==. Calls to `cflush()` will reset how future formatted data is justified.   
    
 #### Example:   
 ```C
@@ -60,7 +60,9 @@ int main() {
    
    
 #### **Atoms:**    
-Atoms represent a segment of the format string (and after manipulation the output) and are created by [Parsing format strings](#parsing-format-strings) . When atoms are created they come in 3 general varieties:    
+Atoms represent a segment of the format string (and after manipulation the output) and are created by parsing format strings.   
+   
+When atoms are created they come in 3 general varieties:    
    
 | Atom Type             | Description                                        |   
 |-----------------------|----------------------------------------------------|   
@@ -96,7 +98,7 @@ Br=bot_root  B=Lower
 ---   
    
 #### Dummy Rows & Atoms. Creating dummies & inserting the first atom   
-Dummy atoms are distinct from regular atoms in that they are created as necessary within `create_atom` by calling `_extend_dummy_rows()` . When dummies are first created or extended, top and bottom dummy atoms in the same column will always link bidirectionally upwards and downwards. When the first atom is created the dummy rows will be automatically created in this way with 1 atom and it will be linked to it. dummies are accessible through navigation or through `dummy_rows` a [`dummy_rows_ds`](#codeline-placeholder-18)   
+Dummy atoms are distinct from regular atoms in that they are created as necessary within `create_atom` by calling `_extend_dummy_rows()` . When dummies are first created or extended, top and bottom dummy atoms in the same column will always link bidirectionally upwards and downwards. When the first atom is created the dummy rows will be automatically created with 1 atom and it will be linked to it. Dummies are accessible through navigation or through `dummy_rows` a [`dummy_rows_ds`](#codeline-placeholder-18)   
    
 ##### Visualization:   
 **Extending the first dummies**    
@@ -124,13 +126,16 @@ Inserting a typical atom follows the following algorithm:
 **3)** Create bidirectional links for top and bottom.   
 **4)** Connect left to the last atom and set the new atom to last.   
    
-![](Images/Extend.png)   
+<figure>   
+  <img src="Images/Regular%20insertP1.png" width="" alt="Regular insertP1" title="Regular insertP1" />   
+  <figcaption>Regular insertP1</figcaption>   
+</figure>   
+   
 ##### Newline:   
 Newlines will set bidirectional links with the dummy root and upwards with the last dummy.   
    
    
 ---   
-   
    
    
    
@@ -145,8 +150,8 @@ function: `_cprintf()` [`_cprintf() `](#codeline-placeholder-28).  `_cprintf()` 
    
 ---   
    
-#### 2) Calculating the widest atom every column:   
-Calling [`cflush()`](#codeline-placeholder-13) initiates a tabulation and output sequence. this sequence begins with [`calc_max_width()`](#codeline-placeholder-31) which traverses the structure walking down the columns starting at the `top_root` and finding which of the atoms has the largest field width. The largest field width Then gets stored in atoms in this column as `new_field_width`.   
+#### 2) Calculating the widest atom in every column:   
+Calling [`cflush()`](#codeline-placeholder-13) initiates a tabulation and output sequence. This sequence begins with [`calc_max_width()`](#codeline-placeholder-31) which traverses the structure walking down the columns starting at the `top_root` and finding which of the atoms has the largest field width. The largest field width then gets stored in atoms in this column as `new_field_width`.   
    
    
 ---   
@@ -162,11 +167,6 @@ The stored data structure is then traversed by  [`print_something_already()`](#c
    
    
 ---   
-   
-   
-   
-   
-   
    
    
    
