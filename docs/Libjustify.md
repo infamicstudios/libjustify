@@ -34,7 +34,7 @@ Libjustify offers 4 new [Functions](#functions) that are used with the same synt
 | `vfprintf()` | `cvfprintf()` | Accepts a `va_list` argument and writes formatted tabulate output to the specified output stream. |   
    
    
-These format strings and store them as ([**Atoms **](#atoms)). ==To finally print and free all the data you must call `cflush()`==. Format strings are tabulated and justified to the width of the longest conversion specifier/text in that row.    
+These format strings and store them as ([Atoms](#atoms)). ==To finally print and free all the data you must call `cflush()`==. Format strings are tabulated and justified to the width of the longest conversion specifier/text in that row.    
    
 ==**NOTE: `cflush()` should always be called before program termination**==. Calls to `cflush()` will reset how future formatted data is justified.   
    
@@ -59,7 +59,7 @@ int main() {
 ---   
    
    
-#### **Atoms:**    
+#### Atoms:    
 Atoms represent a segment of the format string (and after manipulation the output) and are created by parsing format strings.   
    
 When atoms are created they come in 3 general varieties:    
@@ -68,7 +68,7 @@ When atoms are created they come in 3 general varieties:
 |-----------------------|----------------------------------------------------|   
 | Conversion Specifiers | Represent a Conversion Specifiers storing extracted Flags, field width, precision, length modifier, format, etc  |   
 | Plain Text            | Stores a plain text string                                                                                   |   
-| Dummies               | Empty Atoms that store only navigation pointers. [Dummy Rows. Creating dummies & inserting the first atom](#dummy-rows-creating-dummies-inserting-the-first-atom)   
+| Dummies               | Empty Atoms that store only navigation pointers. [Dummy Rows & Atoms. Creating dummies & inserting the first atom](#Dummy%20Rows%20&%20Atoms.%20Creating%20dummies%20&%20inserting%20the%20first%20atom)   
    
 All Atoms are also nodes for a 2D doubly linked list  [Structure](#structure)   
    
@@ -98,7 +98,7 @@ Br=bot_root  B=Lower
 ---   
    
 #### Dummy Rows & Atoms. Creating dummies & inserting the first atom   
-Dummy atoms are distinct from regular atoms in that they are created as necessary within `create_atom` by calling `_extend_dummy_rows()` . When dummies are first created or extended, top and bottom dummy atoms in the same column will always link bidirectionally upwards and downwards. When the first atom is created the dummy rows will be automatically created with 1 atom and it will be linked to it. Dummies are accessible through navigation or through `dummy_rows` a [`dummy_rows_ds`](#codeline-placeholder-18)   
+Dummy atoms are distinct from regular atoms in that they are created as necessary within `create_atom` by calling `_extend_dummy_rows()` . When dummies are first created or extended, top and bottom dummy atoms in the same column will always link bidirectionally upwards and downwards. When the first atom is created the dummy rows will be automatically created with 1 atom and it will be linked to it. Dummies are accessible through navigation or through `dummy_rows` a [`dummy_rows_ds`](#dummy_rows_ds)   
    
 ##### Visualization:   
 **Extending the first dummies**    
@@ -107,7 +107,7 @@ Dummy atoms are distinct from regular atoms in that they are created as necessar
 ![](Images/Starting%20state.png)   
    
 #### Inserting and extending   
-Dummy rows automatically extend if the last atom in the current row of dummies is the bottom dummy or there it has no right pointer:   
+Dummy rows automatically extend if the last atom in the current row of dummies is the bottom dummy or it has no right pointer:   
 ![](Images/Extend.png)   
    
    
@@ -145,25 +145,25 @@ libjustify's algorithm can be broken down into 3 major parts:
    
 #### 1) Parsing format strings and creating atoms.   
 Every time a format string is given to any variant of `cprintf()` it is handled by an internal    
-function: `_cprintf()` [`_cprintf() `](#codeline-placeholder-28).  `_cprintf()` adds a row of atoms that act as an internal representation of that format string. See [**Atoms **](#atoms), [Dummy Rows. Creating dummies & inserting the first atom](#dummy-rows-creating-dummies-inserting-the-first-atom), and [Inserting more atoms](#inserting-more-atoms) for details atoms and on the creation and insertion of atoms.   
+function: `_cprintf()` [`_cprintf()`](#_cprintf()).  `_cprintf()` adds a row of atoms that act as an internal representation of that format string. See [Atoms](#atoms), [Dummy Rows & Atoms. Creating dummies & inserting the first atom](#Dummy%20Rows%20&%20Atoms.%20Creating%20dummies%20&%20inserting%20the%20first%20atom) and [Inserting more atoms](#inserting-more-atoms) for details on atoms and the creation and insertion of atoms.   
    
    
 ---   
    
 #### 2) Calculating the widest atom in every column:   
-Calling [`cflush()`](#codeline-placeholder-13) initiates a tabulation and output sequence. This sequence begins with [`calc_max_width()`](#codeline-placeholder-31) which traverses the structure walking down the columns starting at the `top_root` and finding which of the atoms has the largest field width. The largest field width then gets stored in atoms in this column as `new_field_width`.   
+Calling [`cflush()`][#cflush()] initiates a tabulation and output sequence. This sequence begins with [`calc_max_width()`][#calc_max_width()] which traverses the structure walking down the columns starting at the `top_root` and finding which of the atoms has the largest field width. The largest field width then gets stored in atoms in this column as `new_field_width`.   
    
    
 ---   
 #### 3) Generating new field widths.   
-Calling [`cflush()`](#codeline-placeholder-13) initiates a tabulation and output sequence. The second step in this sequence calls  [`generate_new_specs()`](#codeline-placeholder-35) which uses the previouly stored values for the minimum field width and creates a new format string specification for it based an the stored flags width etc.   
+Calling [`cflush()`][#cflush()] initiates a tabulation and output sequence. The second step in this sequence calls  [`generate_new_specs()`][#generate_new_specs()] which uses the previously stored values for the minimum field width and creates a new format string specification based on the stored flags, width, etc.   
    
    
 ---   
    
 #### 4) Output   
    
-The stored data structure is then traversed by  [`print_something_already()`](#codeline-placeholder-36) which will traverse down each column printing them appropriately based on their new specification (found in the last step)   
+The stored data structure is then traversed by  [`print_something_already()`][#print_something_already()] which will traverse down each column printing them appropriately based on their new specification (found in the last step)   
    
    
 ---   
@@ -174,7 +174,7 @@ The stored data structure is then traversed by  [`print_something_already()`](#c
 ## Reference   
    
    
-####  **`dummy_rows_ds`**   
+#### dummy_rows_ds   
 `dummy_rows_ds` contains automatically set pointers to corners of the upper and lower dummy rows to ease traversal and extension of the dummy rows .   
    
 | Type    | Name | Description                                                 |   
@@ -189,7 +189,7 @@ The stored data structure is then traversed by  [`print_something_already()`](#c
 ---   
    
    
-#### `calc_actual_width`   
+#### calc_actual_width   
    
 **SPEC:**`static voidcalc_actual_width( struct atom *a )`   
    
@@ -211,7 +211,7 @@ The stored data structure is then traversed by  [`print_something_already()`](#c
 ---   
    
    
-#### `calc_max_width()`   
+#### calc_max_width()   
    
 **SPEC:** `void calc_max_width();`   
    
@@ -224,12 +224,12 @@ Details:
    
 ---   
    
-#### `generate_new_specs()`   
+#### generate_new_specs()   
    
    
 **SPEC:** `void generate_new_specs();`   
    
-`generate_new_specs()` generates new format strings for each atom that contain the calculated minimum width fields for each column (computed by [`calc_max_width()`](#codeline-placeholder-31)) writing them to `atom->new_specification`.   
+`generate_new_specs()` generates new format strings for each atom that contain the calculated minimum width fields for each column (computed by [`calc_max_width()`](#calc_max_width()) writing them to `atom->new_specification`.   
    
 Details:    
 `generate_now_specs` walks down each column calling `snprintf()` using the atoms parsed conversion specifications   
@@ -247,7 +247,7 @@ rc = snprintf(buf, 4099, "%%%s%zu%s%s%s",
    
 ---   
    
-#### `_cprintf()`   
+#### \_cprintf()   
    
 **SPEC:** `void _cprintf( FILE *stream, const char *fmt, va_list *args );`   
    
@@ -268,7 +268,7 @@ In handling conversion specifiers, `_cprintf()` ensures all elements - flags, fi
 ---   
    
    
-#### `print_something_already()`   
+#### print_something_already()   
    
 **SPEC:**`void print_something_already()`   
    
@@ -280,11 +280,11 @@ traverses down each column printing each atoms new calculated specification to t
 ---   
    
    
-#### `cflush()`   
+#### cflush()   
    
 **SPEC:** `void cflush( );`   
    
-The `cflush()` function initiates a routine that [`calc_max_width()` ](#codeline-placeholder-31) before generating and storing new justified specifications within every atom. The newly modified structure is then printed to the specified output stream and the entire data structure is freed.   
+The `cflush()` function initiates a routine that [calc_max_width() ](#calc_max_width) before generating and storing new justified specifications within every atom. The newly modified structure is then printed to the specified output stream and the entire data structure is freed.   
    
 **NOTE:** `cflush()` will reset the desired output stream and how future formatting strings are justified.   
    
