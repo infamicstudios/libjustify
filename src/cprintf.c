@@ -502,6 +502,7 @@ calc_actual_width( struct atom *a ){
     (none)/l    f/F/e/E/a/A/g/G double
     L           f/F/e/E/a/A/g/G long double
     (none)      p               void*
+    (none)      n               int*
 */
     if(a->is_dummy) return; //Return early if this is a dummy atom. TODO: This isn't great fix it.
 
@@ -791,6 +792,8 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
     // This fails if subsequent streams don't match the initial one.
     assert( dest == stream );
 
+    atexit( exit_nice ); // Set exit Callback
+
     while( *p != '\0' ){
         d = strcspn( p, "%" ); 
         q = p;
@@ -861,7 +864,6 @@ cfprintf( FILE *stream, const char *fmt, ... ){
     va_start( args, fmt );
     _cprintf( stream, fmt, &args );
     va_end(args);
-    atexit( exit_nice );
 }
 
 void
