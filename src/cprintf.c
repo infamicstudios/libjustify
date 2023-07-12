@@ -731,13 +731,13 @@ void
 print_something_already(){
     // bunch of checks to see if Something horrible happened... No dummies. 
     // TODO: REMOVE IN PROD
-    assert( NULL != origin && NULL != origin->up);
-    struct atom *a = origin->up, *c;
+    //assert( NULL != origin && NULL != origin->up);
+    struct atom *a = origin, *c;
     assert( NULL != a);
     assert( NULL != a->down); 
 
-    do {
-        c = a->down;
+    while ( NULL != a && a != dummy_rows->bot_root) {
+        c = a;
         while ( NULL != c) {
             if( c->is_conversion_specification ){
                 switch( c->type ){
@@ -763,13 +763,13 @@ print_something_already(){
                                                 assert(0);
                                                 break;
                 }
-            } else if ( c->is_dummy == false ){
+            } else {
                 printf( "%s", c->ordinary_text );
             }
             c = c->right;
         }
         a = a->down;
-    } while ( a != NULL);
+    }
 }
 
 void
