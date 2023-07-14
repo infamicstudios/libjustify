@@ -18,7 +18,7 @@ protected:
     int fd_stdout;
 
     virtual void SetUp() {
-        fd_out = open(Writefilename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+        fd_out = open(Writefilename, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
         fd_stdout = dup(STDOUT_FILENO);
         dup2(fd_out, STDOUT_FILENO);
     }
@@ -57,7 +57,7 @@ class Single_Line_Single_String_NoTab : public OutputTest {};
 
 TEST_F(Single_Line_Single_String_NoTab, Test1) {
 
-    cfprintf(stdout, "Hello, %s!\n", "world");
+    cfprintf(stdout, "%-s, %s!\n", "Hello", "world");
     cflush();
 
     const char* cprintf_output = GetOutput();
@@ -70,18 +70,127 @@ TEST_F(Single_Line_Single_String_NoTab, Test1) {
 class Two_Line_Single_String_Tab : public OutputTest {};
 
 TEST_F(Two_Line_Single_String_Tab, Test2) {
-    cfprintf(stdout, "Hello, %s!\n", "world");
-    cfprintf(stdout, "It works on my %s!\n", "machine");
+    cfprintf(stdout, "%-s %s!\n", "Hello", "world");
+    cfprintf(stdout, "%s %s!\n", "It works on my", "machine");
     cflush();
 }
 
 class Three_Line_Two_Single_String_Three_Int_Tab : public OutputTest {};
 
 TEST_F(Three_Line_Two_Single_String_Three_Int_Tab, Test2) {
-    cfprintf(stdout, "Hello, %-s!\n", "world");
-    cfprintf(stdout, "It works on my %s!\n", "machine");
+    cfprintf(stdout, "%-s %s!\n", "Hello", "world");
+    cfprintf(stdout, "%s %s!\n", "It works on my ", "machine");
     cfprintf(stdout, "%d %d %d\n", 1, 2, 3);
     cflush();
+}
+
+class LongTextInMiddle : public OutputTest {};
+
+TEST_F(LongTextInMiddle, Test3) {
+    cfprintf(stdout, "%s : %s\n", "Hyperthreading", "Enabled");
+    //cfprintf(stdout, "It works on my %s %s\n", "machine", "Sometimes");
+    cfprintf(stdout, "%d : %d : %d\n", 1, 2, 3);
+    cfprintf(stdout, "%d : %d : %d : %d\n", 1, 2, 3, 4);
+    //cfprintf(stdout, "This text is the longest : %d : %d\n\n\n",5, 10);
+    cflush();
+}
+
+void print_children(unsigned int i) {
+    unsigned ARR_SIZE = 32;
+
+    if( i == 0 ) {
+        cprintf("%s %s %s %s\n", "Thread", "HWThread", "Core", "Socket");
+    }
+
+    int socket = (i > ARR_SIZE/2) % 2;
+    cfprintf(stdout, "%d %d %d %d\n", i, i, i, socket);
+
+    i = i+1;
+    if (i < ARR_SIZE) {
+        print_children(i);
+    } else {
+        cflush();
+    }
+    
+}
+
+//BREAKS RIGHT NOW
+class TestTopologyFlushAfterHeader : public OutputTest {};
+
+TEST_F(TestTopologyFlushAfterHeader, Test4) {
+    char *hostname = "quartz1234";
+    int num_sockets = 2;
+    int num_cores_per_socket = 18;
+    int total_cores = num_sockets * num_cores_per_socket;
+    int total_Threads = 36;
+    int threads_per_core = 2;
+
+
+    printf("\n\n\n");
+    cfprintf(stdout, "=================\n");
+    cfprintf(stdout, "Platform Topology\n");
+    cfprintf(stdout, "=================\n");
+    cflush();
+    cfprintf(stdout, "%-s: %s\n", "Hostname", hostname);
+    //cfprintf(stdout, "Num Sockets: %d\n", num_sockets);
+    cfprintf(stdout, "%-s: %d\n", "Num Cores per Socket", num_cores_per_socket);
+
+    if ( threads_per_core == 1)
+    {
+        cfprintf(stdout, "%-s: %s\n", "  Hyperthreading", "No");
+    }
+    else
+    {
+        cfprintf(stdout, "%-s: %s\n", "  Hyperthreading", "Yes");
+    }
+
+    
+    cfprintf(stdout, "\n");
+    cfprintf(stdout, "%-s: %d\n", "Total Num of Cores", total_cores);
+    cfprintf(stdout, "%-s: %d\n", "Total Num of Threads", total_Threads);
+    cfprintf(stdout, "\n");
+    cfprintf(stdout, "Layout:\n");
+    cfprintf(stdout, "-------\n");
+    cflush();
+    print_children(0);
+}
+
+
+//BREAKS RIGHT NOW
+class TestTopologyNoHeaderFlush : public OutputTest {};
+
+TEST_F(TestTopologyNoHeaderFlush, Test5) {
+    char *hostname = "quartz1234";
+    int num_sockets = 2;
+    int num_cores_per_socket = 18;
+    int total_cores = num_sockets * num_cores_per_socket;
+    int total_Threads = 36;
+    int threads_per_core = 2;
+
+    cfprintf(stdout, "%c\n", ' ');
+    cfprintf(stdout, "=================\n");
+    cfprintf(stdout, "Platform Topology\n");
+    cfprintf(stdout, "=================\n");
+    cfprintf(stdout, "%-s: %d\n", "Num Cores per Socket", num_cores_per_socket);
+
+    if ( threads_per_core == 1)
+    {
+        cfprintf(stdout, "%-s: %s\n", "  Hyperthreading", "No");
+    }
+    else
+    {
+        cfprintf(stdout, "%-s: %s\n", "  Hyperthreading", "Yes");
+    }
+    
+    cfprintf(stdout, "\n");
+    cfprintf(stdout, "%-s: %d\n", "Total Num of Cores", total_cores);
+    cfprintf(stdout, "%-s: %d\n", "Total Num of Threads", total_Threads);
+    cfprintf(stdout, "\n");
+    cfprintf(stdout, "Layout:\n");
+    cfprintf(stdout, "-------\n");
+    dump_graph();
+    cflush();
+    print_children(0);
 }
 
 int main(int argc, char **argv) {
