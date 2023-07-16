@@ -53,31 +53,66 @@ protected:
     }
 };
 
-class Single_Line_Single_String_NoTab : public OutputTest {};
 
-TEST_F(Single_Line_Single_String_NoTab, Test1) {
 
+void printtestHeader(int testnum){
+    printf("\n\n\n");
+    printf("=====================================\n");
+    printf("Test %d\n", testnum);
+    printf("=====================================\n");
+}
+
+class Hello_World: public OutputTest {};
+
+TEST_F(Hello_World, Test1) {
+    printtestHeader(1);
     cfprintf(stdout, "%-s, %s!\n", "Hello", "world");
     cflush();
-
     const char* cprintf_output = GetOutput();
+
     fprintf(stdout, "Hello, %s!\n", "world");
     const char* printf_output = GetOutput();
 
     ASSERT_STREQ(cprintf_output, printf_output);
 }
 
-class Two_Line_Single_String_Tab : public OutputTest {};
+class Test_Int_Specifier: public OutputTest {};
 
-TEST_F(Two_Line_Single_String_Tab, Test2) {
+TEST_F(Test_Int_Specifier, Test2) {
+
+    //wrote a custom function for this... doesn't work for now.
+    //TestSpecifiers("%d, %d\n", 123, -456);
+    //TestSpecifiers("%i, %i\n", 789, -321);
+    printtestHeader(2);
+    cfprintf(stdout, "%d, %d\n", 123, -456);
+    cfprintf(stdout, "%i, %i\n", 789, -321);
+    cflush();
+    const char* cprintf_output = GetOutput();
+
+    fprintf(stdout, "%d, %d\n", 123, -456);
+    fprintf(stdout, "%i, %i\n", 789, -321);
+    const char* printf_output = GetOutput();
+
+    ASSERT_STREQ(cprintf_output, printf_output);
+}
+
+
+class conversion_specs : public OutputTest {};
+
+TEST_F(conversion_specs, Test3) {
+    printtestHeader(3);
     cfprintf(stdout, "%-s %s!\n", "Hello", "world");
+    cflush();
+    const char* cprintf_output = GetOutput();
+
     cfprintf(stdout, "%s %s!\n", "It works on my", "machine");
+    const char* printf_output = GetOutput();
     cflush();
 }
 
 class Three_Line_Two_Single_String_Three_Int_Tab : public OutputTest {};
 
-TEST_F(Three_Line_Two_Single_String_Three_Int_Tab, Test2) {
+TEST_F(Three_Line_Two_Single_String_Three_Int_Tab, Test4) {
     cfprintf(stdout, "%-s %s!\n", "Hello", "world");
     cfprintf(stdout, "%s %s!\n", "It works on my ", "machine");
     cfprintf(stdout, "%d %d %d\n", 1, 2, 3);
@@ -86,7 +121,7 @@ TEST_F(Three_Line_Two_Single_String_Three_Int_Tab, Test2) {
 
 class LongTextInMiddle : public OutputTest {};
 
-TEST_F(LongTextInMiddle, Test3) {
+TEST_F(LongTextInMiddle, Test5) {
     cfprintf(stdout, "%s : %s\n", "Hyperthreading", "Enabled");
     //cfprintf(stdout, "It works on my %s %s\n", "machine", "Sometimes");
     cfprintf(stdout, "%d : %d : %d\n", 1, 2, 3);
@@ -114,10 +149,10 @@ void print_children(unsigned int i) {
     
 }
 
-//BREAKS RIGHT NOW
-class TestTopologyFlushAfterHeader : public OutputTest {};
+class TestTopology : public OutputTest {};
 
-TEST_F(TestTopologyFlushAfterHeader, Test4) {
+TEST_F(TestTopology, Test6) {
+    printtestHeader(4);
     char *hostname = "quartz1234";
     int num_sockets = 2;
     int num_cores_per_socket = 18;
@@ -126,7 +161,6 @@ TEST_F(TestTopologyFlushAfterHeader, Test4) {
     int threads_per_core = 2;
 
 
-    printf("\n\n\n");
     cfprintf(stdout, "=================\n");
     cfprintf(stdout, "Platform Topology\n");
     cfprintf(stdout, "=================\n");
@@ -151,44 +185,6 @@ TEST_F(TestTopologyFlushAfterHeader, Test4) {
     cfprintf(stdout, "\n");
     cfprintf(stdout, "Layout:\n");
     cfprintf(stdout, "-------\n");
-    cflush();
-    print_children(0);
-}
-
-
-//BREAKS RIGHT NOW
-class TestTopologyNoHeaderFlush : public OutputTest {};
-
-TEST_F(TestTopologyNoHeaderFlush, Test5) {
-    char *hostname = "quartz1234";
-    int num_sockets = 2;
-    int num_cores_per_socket = 18;
-    int total_cores = num_sockets * num_cores_per_socket;
-    int total_Threads = 36;
-    int threads_per_core = 2;
-
-    cfprintf(stdout, "%c\n", ' ');
-    cfprintf(stdout, "=================\n");
-    cfprintf(stdout, "Platform Topology\n");
-    cfprintf(stdout, "=================\n");
-    cfprintf(stdout, "%-s: %d\n", "Num Cores per Socket", num_cores_per_socket);
-
-    if ( threads_per_core == 1)
-    {
-        cfprintf(stdout, "%-s: %s\n", "  Hyperthreading", "No");
-    }
-    else
-    {
-        cfprintf(stdout, "%-s: %s\n", "  Hyperthreading", "Yes");
-    }
-    
-    cfprintf(stdout, "\n");
-    cfprintf(stdout, "%-s: %d\n", "Total Num of Cores", total_cores);
-    cfprintf(stdout, "%-s: %d\n", "Total Num of Threads", total_Threads);
-    cfprintf(stdout, "\n");
-    cfprintf(stdout, "Layout:\n");
-    cfprintf(stdout, "-------\n");
-    dump_graph();
     cflush();
     print_children(0);
 }
