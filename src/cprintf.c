@@ -118,6 +118,7 @@ struct atom * _link_normal_atom(struct atom* a, struct atom * curr_lower_dummy, 
 //Enumerate methods to handle dummy rows.
 struct atom * _make_dummy( void);
 void _extend_dummy_rows(size_t size);
+void _create_dummy_rows(void);
 void _reconnect_rows(void);
 
 ptrdiff_t parse_flags( const char *p );
@@ -144,7 +145,10 @@ static FILE *dest = NULL;
 struct atom *
 _make_dummy( void ) {
     struct atom *a = calloc( sizeof( struct atom ), 1 );
-    assert(a);
+    if(NULL == a){
+        fprintf(stderr, "Memory allocation failed.\n");
+        exit_nice();
+    }
 
     a->original_specification       = NULL;
     a->new_specification            = NULL;
@@ -171,6 +175,15 @@ _make_dummy( void ) {
 
 
 void
+_create_dummy_rows(void){
+    dummy_rows = calloc(1, sizeof(struct dummy_rows_ds));
+    if (NULL == dummy_rows) {
+        fprintf(stderr, "Memory allocation failed.\n");
+        exit_nice();
+    }
+}
+
+void
 _extend_dummy_rows(size_t size) {
     struct atom * new_top;
     struct atom * new_bottom;
@@ -183,11 +196,7 @@ _extend_dummy_rows(size_t size) {
         new_bottom->up = new_top;
 
         if (NULL == dummy_rows){
-            dummy_rows = calloc(1, sizeof(struct dummy_rows_ds));
-            if (NULL == dummy_rows) {
-                fprintf(stderr, "Memory allocation failed.\n");
-                exit(EXIT_FAILURE);
-            }
+            _create_dummy_rows();
             dummy_rows->bot_root = new_bottom;
             dummy_rows->top_root = new_top;
         } else {
@@ -419,8 +428,6 @@ create_atom( bool is_newline ){
         //         couple of anticipated dummies. 
         //
         //TODO:    Profile the latter change and modify for the former.
-        //TODO:    This isn't gonna be  memory contrained, I can for sure 
-        //         spare a few pointers to make this less horrible. 
 
         curr_lower_dummy = last_atom_on_last_line->down->right;
         a = _link_normal_atom(a, curr_lower_dummy, extend_by);
@@ -740,31 +747,6 @@ void generate_new_specs(){
         a = a->right;
     }
 }
-
-/*void
-generate_new_specs(){
-    char buf[4099];
-    int rc;
-    struct atom *a = dummy_rows->top_root, *c; //A is the top dummy row.
-    assert( NULL != a );
-    while( NULL != a){
-        if( a->down->is_conversion_specification ){ 
-            c = a->down;
-            while( NULL != c ){
-                rc = snprintf(buf, 4099, "%%%s%zu%s%s%s",
-                        c->flags,
-                        c->new_field_width,
-                        c->precision,
-                        c->length_modifier,
-                        c->conversion_specifier);
-                assert( rc < 4099 );
-                archive( buf, strlen(buf), &(c->new_specification));
-                c = c->down;
-            }
-        }
-        a = a->right;
-    }
-}*/
 
 void 
 calculate_writeback(struct atom * a) {
