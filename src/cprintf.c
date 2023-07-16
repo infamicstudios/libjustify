@@ -113,12 +113,12 @@ struct atom * create_atom( bool is_newline );
 //Enumerated methods to handle different cases of atom creation.
 struct atom * _handle_origin_null( struct atom *a, int extend_by);
 struct atom * _handle_new_line(struct atom *a);
-struct atom * _link_normal_atom(struct atom* a, struct atom * curr_lower_dummy, int extend_by);
+struct atom * _link_normal_atom(struct atom *a, struct atom *curr_lower_dummy, int extend_by);
 
 //Enumerate methods to handle dummy rows.
+void _create_dummy_rows(void);
 struct atom * _make_dummy( void);
 void _extend_dummy_rows(size_t size);
-void _create_dummy_rows(void);
 void _reconnect_rows(void);
 
 ptrdiff_t parse_flags( const char *p );
@@ -131,7 +131,8 @@ bool is( char *p, const char *q );
 void _cprintf( FILE *stream, const char *fmt, va_list *args );
 
 void exit_nice(void);
-void calculate_writeback(struct atom * a);
+void cprintf_error( char *err_msg, int err_code );
+void calculate_writeback(struct atom *a);
 
 
 // Might be nice to take these and turn them into their
@@ -145,9 +146,9 @@ static FILE *dest = NULL;
 struct atom *
 _make_dummy( void ) {
     struct atom *a = calloc( sizeof( struct atom ), 1 );
+
     if(NULL == a){
-        fprintf(stderr, "Memory allocation failed.\n");
-        exit_nice();
+        cprintf_error("Memory allocation failed.", EXIT_FAILURE);
     }
 
     a->original_specification       = NULL;
@@ -169,19 +170,20 @@ _make_dummy( void ) {
 
     a->is_dummy                     = true;
 
-    a->is_conversion_specification  = false;
+    // TODO: Probably not necessary.
+    a->is_conversion_specification  = false; 
     return a;
 };
 
 
-void
+void 
 _create_dummy_rows(void){
     dummy_rows = calloc(1, sizeof(struct dummy_rows_ds));
     if (NULL == dummy_rows) {
-        fprintf(stderr, "Memory allocation failed.\n");
-        exit_nice();
+        cprintf_error("Memory allocation failed.", EXIT_FAILURE);
     }
 }
+
 
 void
 _extend_dummy_rows(size_t size) {
@@ -192,11 +194,20 @@ _extend_dummy_rows(size_t size) {
         new_top = _make_dummy();
         new_bottom = _make_dummy();
 
+        if(NULL == new_top || NULL == new_bottom){
+            cprintf_error("Memory allocation failed.", EXIT_FAILURE);
+        }
+
         new_top->down = new_bottom;
         new_bottom->up = new_top;
 
         if (NULL == dummy_rows){
             _create_dummy_rows();
+
+            if(NULL == dummy_rows){ //Double check, can't hurt.
+                cprintf_error("Memory allocation failed.", EXIT_FAILURE);
+            }
+
             dummy_rows->bot_root = new_bottom;
             dummy_rows->top_root = new_top;
         } else {
@@ -206,11 +217,15 @@ _extend_dummy_rows(size_t size) {
             dummy_rows->lower->right = new_bottom;
         }
 
-        assert(dummy_rows != NULL);
+        if( NULL == dummy_rows ){
+            cprintf_error("Memory allocation failed.", EXIT_FAILURE);
+        }
+
         dummy_rows->upper = new_top;
         dummy_rows->lower = new_bottom;
     }
 };
+
 
 void
 dump_graph( void ){
@@ -300,6 +315,13 @@ dump_graph( void ){
         a = a->down;
     }
     fflush(NULL);
+}
+
+
+void cprintf_error(char *err_msg, int err_code){
+    fprintf(stderr, "%s\n", err_msg);
+    free_graph();
+    exit(err_code);
 }
 
 //TODO CLEAN THIS UP. USING DUMMY_ROWS->UPPER AS THE ROOT OF THE UPPER IS VERY HACKY.
@@ -393,6 +415,9 @@ create_atom( bool is_newline ){
     struct atom *curr_lower_dummy = NULL;
 
     struct atom *a = calloc( sizeof( struct atom ), 1 );
+    if (NULL == a) {
+        cprintf_error("Memory allocation failed.", EXIT_FAILURE);
+    }
     assert(a);
     
     // recall the value of NULL is implementation-specific.
@@ -821,6 +846,18 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
     const char *p = fmt, *q = fmt;
     ptrdiff_t d = 0;
     ptrdiff_t span;
+    if(fileno(stream) == -1) {
+        fprintf(stderr, "Error: Invalid stream\n");
+        exit_nice();
+    }
+    if(fmt == NULL) {
+        fprintf(stderr, "Error: Invalid format string\n");
+        exit_nice();
+    }
+    if(args == NULL) {
+        fprintf(stderr, "Error: Invalid args\n");
+        exit_nice();
+    }
     /* There's a reasonable argument that newlines should be indicated by
        '\n' in the ordinary text, which would allow successive calls to 
        cprintf() to populate a single line.  This raises, however, the
@@ -843,6 +880,10 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
         if( d == 0 ){
             // We've found a converstion specification.
             a = create_atom( is_newline );
+
+            if (a == NULL){
+                cprintf_error("Error: Memory allocation failed.", EXIT_FAILURE);
+            }
             a->pargs = args;
             a->is_conversion_specification = true;
 
@@ -867,6 +908,11 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
             span = parse_conversion_specifier( q );
             archive( q, span, &(a->conversion_specifier) );
             q += span;
+
+            if(span < 0) {
+                fprintf(stderr, "Error: Invalid conversion specifier.\n");
+                exit_nice();
+            }
 
             archive( p, q-p, &(a->original_specification) ); 
 
