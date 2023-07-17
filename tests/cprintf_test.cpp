@@ -80,9 +80,6 @@ class Test_Int_Specifier: public OutputTest {};
 
 TEST_F(Test_Int_Specifier, Test2) {
 
-    //wrote a custom function for this... doesn't work for now.
-    //TestSpecifiers("%d, %d\n", 123, -456);
-    //TestSpecifiers("%i, %i\n", 789, -321);
     printtestHeader(2);
     cfprintf(stdout, "%d, %d\n", 123, -456);
     cfprintf(stdout, "%i, %i\n", 789, -321);
@@ -102,11 +99,9 @@ class conversion_specs : public OutputTest {};
 TEST_F(conversion_specs, Test3) {
     printtestHeader(3);
     cfprintf(stdout, "%-s %s!\n", "Hello", "world");
+    cfprintf(stdout, "%s %s!\n", "It works on my", "machine");
     cflush();
     const char* cprintf_output = GetOutput();
-
-    cfprintf(stdout, "%s %s!\n", "It works on my", "machine");
-    const char* printf_output = GetOutput();
     cflush();
 }
 
@@ -119,16 +114,6 @@ TEST_F(Three_Line_Two_Single_String_Three_Int_Tab, Test4) {
     cflush();
 }
 
-class LongTextInMiddle : public OutputTest {};
-
-TEST_F(LongTextInMiddle, Test5) {
-    cfprintf(stdout, "%s : %s\n", "Hyperthreading", "Enabled");
-    //cfprintf(stdout, "It works on my %s %s\n", "machine", "Sometimes");
-    cfprintf(stdout, "%d : %d : %d\n", 1, 2, 3);
-    cfprintf(stdout, "%d : %d : %d : %d\n", 1, 2, 3, 4);
-    //cfprintf(stdout, "This text is the longest : %d : %d\n\n\n",5, 10);
-    cflush();
-}
 
 void print_children(unsigned int i) {
     unsigned ARR_SIZE = 32;
@@ -151,9 +136,9 @@ void print_children(unsigned int i) {
 
 class TestTopology : public OutputTest {};
 
-TEST_F(TestTopology, Test6) {
+TEST_F(TestTopology, Test5) {
     printtestHeader(4);
-    char *hostname = "quartz1234";
+    const char *hostname = "quartz1234";
     int num_sockets = 2;
     int num_cores_per_socket = 18;
     int total_cores = num_sockets * num_cores_per_socket;
