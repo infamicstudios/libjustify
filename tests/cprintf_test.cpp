@@ -94,24 +94,36 @@ TEST_F(Test_Int_Specifier, Test2) {
 }
 
 
-class conversion_specs : public OutputTest {};
+class Strings_Two_lines : public OutputTest {};
 
-TEST_F(conversion_specs, Test3) {
+TEST_F(Strings_Two_lines, Test3) {
     printtestHeader(3);
     cfprintf(stdout, "%-s %s!\n", "Hello", "world");
     cfprintf(stdout, "%s %s!\n", "It works on my", "machine");
     cflush();
     const char* cprintf_output = GetOutput();
-    cflush();
+
+    fprintf(stdout, "Hello             world!");
+    fprintf(stdout, "It works on my  machine!");
+    const char* printf_output = GetOutput();
+
+    ASSERT_STREQ(cprintf_output, printf_output);
 }
 
-class Three_Line_Two_Single_String_Three_Int_Tab : public OutputTest {};
+class Test_Two_line_Integer_and_Float : public OutputTest {};
 
-TEST_F(Three_Line_Two_Single_String_Three_Int_Tab, Test4) {
-    cfprintf(stdout, "%-s %s!\n", "Hello", "world");
-    cfprintf(stdout, "%s %s!\n", "It works on my ", "machine");
+TEST_F(Test_Two_line_Integer_and_Float, Test4) {
     cfprintf(stdout, "%d %d %d\n", 1, 2, 3);
+    cfprintf(stdout, "%f %f %e\n", 3.14159, 1.618033, 299792458.0);
     cflush();
+    const char* cprintf_output = GetOutput();
+
+    fprintf(stdout, "%f %f %e\n", 3.14159, 1.618033, 299792458.0);
+    fprintf(stdout, "   1        2            3");
+    const char* printf_output = GetOutput();
+
+    ASSERT_STREQ(cprintf_output, printf_output);
+    
 }
 
 
@@ -175,23 +187,6 @@ TEST_F(TestTopology, Test5) {
 }
 
 int main(int argc, char **argv) {
-
-    int opt;
-    static const char *optstring = "oht:";
-    while ((opt = getopt(argc, argv, optstring)) != -1) {
-        switch (opt) {
-        case 'o':
-            print_output = true;
-            printf("Printing output from each test\n");
-            break;
-        case 'h':
-            printf("Options:\n\t-o: Print output\n\t-h: Print this help message\n");
-            exit(0);
-        default: /* '?' */
-            fprintf(stderr, "Usage: %s [-p][-h]\n", argv[0]);
-            exit(EXIT_FAILURE);
-        }
-    }
 
     printf("Redirecting output to %s\n", Writefilename);
 
