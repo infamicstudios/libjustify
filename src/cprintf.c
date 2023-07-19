@@ -136,8 +136,8 @@ void _cprintf( FILE *stream, const char *fmt, va_list *args );
 
 void exit_nice(void);
 
-void cprintf_error( char *err_msg, int err_code );
-void cprintf_warning( char *err_msg );
+void cprintf_error( char *fmt, ...);
+void cprintf_warning( char *fmt, ...);
 
 
 void setup(FILE *stream);
@@ -175,84 +175,106 @@ setup(FILE *stream){
 // Reset the state of the graph, this should be called after the graph is freed.
 void 
 teardown(void) {
+
     is_initialized = false;
     state->top_left = NULL;
     state->bot_left = NULL;
     state->top_right = NULL;
     state->bot_right = NULL;
-    state->empty_graph = true;
     state->last_atom_on_last_line = NULL;
     state->origin = NULL;
     state->dest = NULL;
+
+    free(state);
+    state = NULL;
 }
 
 
-//TODO: Refactor origin_finder_safe() into this to rebuild the state when necessary.
+
 void 
 rebuild_broken_state(void) {
     return;
 }
 
-// We check if we can grab a top left but if something horrible happens 
-// to the state and it becomes broken in an unexpected way we want to rebuild the state
-// from whatever is available. And then grab the top left.
-// operate normally. 
-// the _free_graph() / whatever calling process using that alternative origin.
+// We check if we can grab a top left validating it's a dummy. If something unexpected happens 
+// to the state and it's become broken, we want to locate and reassign the top left however possible to let
+// use print and flush.
 // NOTE: This is probably not something that will be encountered in practice.
 //       But it's good to have a backup plan in case something goes wrong.
-// TODO: It's a huge can of worms but these are subideal and could probably be improved with a search algorithm.
-// TODO: These are in the order that seems best to me but it's use case dependent.
+//TODO:  Refactor into rebuild_broken_state() which can rebuild the entire state.
+//       There's probably a clever algorithmic way to do that.
+
 struct atom *
-origin_finder_safe (void) {
+top_left_finder_safe (void) {
     struct atom *a = NULL;
+    struct atom *new_top_left = NULL;
 
-    //rebuild_broken_state(); 
-    //return state->top_left;
+    static char *TOP_LEFT = "top_left";
+    static char *ORIGIN = "origin";
+    static char *TOP_RIGHT = "top_right";
+    static char *BOT_LEFT = "bot_left";
+    static char *BOT_RIGHT = "bot_right";
+    static char *LAST_ATOM_LAST_LINE = "last_atom_on_last_line";
+    static char *STATE = "State";
 
-    if(state != NULL) {
-        if( NULL != state->top_left ) {
-            return state->top_left;
+    while( NULL == new_top_left) {
+        if( NULL != state->top_left) {
+            return state->top_left; // This is the best case scenario. 
         } else if( NULL != state->origin ) {
-            cprintf_warning("State is in an invalid 'state' but the origin is still valid.");
-            if(NULL == state->origin->up) {
-                cprintf_warning("Error in origin_finder_safe: State is in an invalid 'state'\
-                    and the top dummies are not linked");
-                return state->origin;
-            }
-            return state->origin->up;
-        } else if( NULL != state->top_right ) {
-            for(a = state->top_right; a != NULL; a = a->left) {
-                if(NULL == a->left) {
-                    return a;
-                }
-            }
-        } else if( NULL != state->bot_left ) {
-            for(a = state->bot_left; a != NULL; a = a->up) {
-                if(NULL == a->up) {
-                    return a;
-                }
-            }
+
+            cprintf_warning(
+                            "%s lacks: { %s } but the %s was located.", 
+                            STATE, TOP_LEFT, ORIGIN);
+            new_top_left = (NULL != state->origin->up) ? state->origin->up : state->origin;
+
+        } else if( NULL != state->top_right) {
+
+            cprintf_warning(
+                            "%s lacks: { %s, %s } but the %s was located.", 
+                            STATE, TOP_LEFT, ORIGIN, TOP_RIGHT);
+            for( a = state->top_right; a->left != NULL; a = a->left) {}
+            new_top_left = a;
+
+        } else if( NULL != state->bot_left) {
+
+            cprintf_warning(
+                            "%s lacks: { %s, %s, %s } but the %s was located.", 
+                             STATE, TOP_LEFT, ORIGIN, TOP_RIGHT, BOT_LEFT);
+            for(a = state->bot_left; a->up != NULL; a = a->up) {}
+            new_top_left = a;
+
         } else if( NULL != state->last_atom_on_last_line ) {
-            a = state->last_atom_on_last_line;
-            for(; a->left != NULL; a = a->left)
-            for(; a != NULL; a = a->up) {
-                if(NULL == a->up) {
-                    return a;
-                }
-            }
+
+            cprintf_warning(
+                            "%s lacks: { %s, %s, %s, %s } but the %s was located.", 
+                            STATE, TOP_LEFT, ORIGIN, TOP_RIGHT, BOT_LEFT, LAST_ATOM_LAST_LINE);
+            for(a = state->last_atom_on_last_line; a->left != NULL; a = a->left){}
+            for(; a->up != NULL; a = a->up) {}
+            new_top_left = a;
+
         } 
         else if( NULL != state->bot_right ) {
-            struct atom *a = state->bot_right;
-            for(a = state->bot_right; a->right != NULL; a = a->right) 
-            for(; a != NULL; a = a->up) {
-                if(NULL == a->up) {
-                    return a;
-                }
-            }
-        } 
-        cprintf_error("Error in origin_finder_safe: State is in an invalid 'state'\
-            and the origin could not be located through any means", EXIT_FAILURE);
+
+            cprintf_warning(
+                            "%s lacks: { %s, %s, %s, %s, %s } but the %s was located.", 
+                            STATE, TOP_LEFT, ORIGIN, TOP_RIGHT, BOT_LEFT, LAST_ATOM_LAST_LINE, BOT_RIGHT);
+            for(a = state->bot_right; a->left != NULL; a = a->left) {}
+            for(; a->up != NULL; a = a->up) {}
+            new_top_left = a;
+
+        } else {
+            cprintf_error(
+                          "%s is invalid and the %s couldn't be located.", 
+                          STATE, TOP_LEFT);
+        }
     }
+    if(new_top_left->is_dummy == false) {
+        cprintf_error("Error in origin_finder_safe: %s was located but does not appear to be a dummy atom.", TOP_LEFT, EXIT_FAILURE);
+    }
+
+    state->top_left = new_top_left;
+
+    return new_top_left;
 }
 
 struct atom *
@@ -287,25 +309,27 @@ _make_dummy( void ) {
     return a;
 };
 
+
+
 void
 _extend_dummy_rows(size_t size) {
     struct atom * new_top;
     struct atom * new_bottom;
 
-    if( NULL == state ) {
+    if( NULL == state || false == is_initialized) {
         cprintf_error("_extend_dummy_rows: Attempted to extend with an unititialized graph.", EXIT_FAILURE);
     }
 
-    if( size == 0 ) {
-        cprintf_error("Attempted to extend dummy rows by 0.", EXIT_FAILURE); // Maybe this should be a warning?
-    }
 
-    for (; size != 0; --size){
+    if( size == 0 ) {
+        return;
+    } else {
+
         new_top = _make_dummy();
         new_bottom = _make_dummy();
 
         if(NULL == new_top || NULL == new_bottom){
-            cprintf_error("Memory allocation failed. While extending dummy rows.", EXIT_FAILURE);
+            cprintf_error("Memory allocation failed while extending dummy rows.", EXIT_FAILURE);
         }
 
         new_top->down = new_bottom;
@@ -315,6 +339,7 @@ _extend_dummy_rows(size_t size) {
 
             state->top_left = new_top;
             state->bot_left = new_bottom;
+            state->empty_graph = false;
 
         } else {
             new_top->left = state->top_right;
@@ -325,9 +350,11 @@ _extend_dummy_rows(size_t size) {
 
         state->top_right = new_top;
         state->bot_right = new_bottom;
+
+        _extend_dummy_rows(--size);
+
     }
 };
-
 
 void
 dump_graph( void ){
@@ -335,21 +362,7 @@ dump_graph( void ){
     struct atom *a;
     struct atom *c;
 
-    if( false == is_initialized || NULL == state ){
-        cprintf_warning("Attempted to an dump an uninitialized graph.");
-        return;
-    }
-
-    if( false == state->empty_graph){
-        cprintf_warning("Attempted to an dump an empty graph.");
-        return;
-    }
-    if( state->top_left == NULL){
-        cprintf_warning("State configuration (top_left is somehow broken) attempting to find origin.");
-        a = origin_finder_safe(), *c;
-    } else {
-        a = state->top_left, *c;
-    }
+    a = top_left_finder_safe(), *c; // Grab any top left
 
     while( NULL != a ){
         // Address of this atom.
@@ -438,16 +451,27 @@ dump_graph( void ){
     fflush(NULL);
 }
 
+void cprintf_error(char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    fprintf(stderr, "ERROR: ");
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+    va_end(args);
 
-void cprintf_error(char *err_msg, int err_code){
-    fprintf(stderr, "ERROR: %s\n", err_msg);
-    free_graph();
-    exit(err_code);
+    teardown();
+    exit(EXIT_FAILURE);
 }
 
-void cprintf_warning(char *err_msg){
-    fprintf(stderr, "WARNING: %s\n", err_msg);
+void cprintf_warning(char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    fprintf(stderr, "WARNING: ");
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+    va_end(args);
 }
+
 
 //TODO CLEAN THIS UP. USING DUMMY_ROWS->UPPER AS THE ROOT OF THE UPPER IS VERY HACKY.
 void
@@ -456,16 +480,14 @@ _free_graph( struct atom *a ){
     //TODO: We should still even if something horrible has happened
     //      try to free everything based on what does exist.
     if(is_initialized == false || NULL == state) {
-        cprintf_warning("Attempted to free an empty / uninitialized graph.");
+        cprintf_warning("Attempted to free an uninitialized graph.");
     } else if (state->empty_graph == true) {
         cprintf_warning("Attempted to free an empty graph");
-        return;
     } else if (NULL == state->top_left) {
         cprintf_warning("Attempted to free a graph with a NULL top_left state, this is likely a \
                          bug\n. We will locate origin if it exists and try to free.");
-        a = origin_finder_safe();
     } else if (NULL == a) {
-        a = state->top_left;
+        a = top_left_finder_safe(); // Fixes state->top_left if it got broken.
     }
 
     // Find the rightmost atom in the top line.
@@ -480,7 +502,8 @@ _free_graph( struct atom *a ){
 
     // If we're at the point where we're looking at the atom in the top left
     // corner, we're done.
-    if (a == state->top_left){
+    // If top_left got broken, 
+    if (a == state->top_left){ 
         teardown(); // Reset the state of the graph.
     }
 
@@ -509,15 +532,8 @@ _free_graph( struct atom *a ){
 
 void
 free_graph(){
-    //We give an error message in _free_graph() but here we should try to free up stuff 
-    // In the event something horrible has happened.
-    if(state == NULL || state->empty_graph == true) {
-        cprintf_warning("Attempted to free an uninitialized graph.");
-        return;
-    }
+    //top_left_finder_safe();
     _free_graph( state->top_left ); //Go to the dummy row. This is kinda convoluted
-    free( state );
-    state = NULL;
 }
 
 //NOTE: It's probably better to build the first row of true atoms and
@@ -526,7 +542,7 @@ free_graph(){
 struct atom*
 _handle_origin_null(struct atom *a, int extend_by) {
     if( NULL == a ){
-        cprintf_error("Error in _handle_origin_null: Atom passed in is NULL.", EXIT_FAILURE);
+        cprintf_error("in %s: Atom passed in is NULL.", EXIT_FAILURE);
     }
     _extend_dummy_rows(extend_by);
     a->down = state->bot_left;
@@ -534,7 +550,7 @@ _handle_origin_null(struct atom *a, int extend_by) {
     if( NULL == state->origin ){
         state->origin = a;
     } else {
-        cprintf_error("Error in _handle_origin_null: Origin is not NULL (somehow).", EXIT_FAILURE);
+        cprintf_error("in %s: Origin is not NULL (somehow).", __PRETTY_FUNCTION__);
     }
 
     return a;
@@ -543,10 +559,10 @@ _handle_origin_null(struct atom *a, int extend_by) {
 struct atom*
 _handle_new_line(struct atom *a) {
     if( NULL == a ){
-        cprintf_error("Error in _handle_new_line: Atom passed in is NULL.", EXIT_FAILURE);
+        cprintf_error("in %s:in _handle_new_line: Atom passed in is NULL.", __PRETTY_FUNCTION__);
     }
     if( NULL == state || NULL == state->bot_left ) {
-        cprintf_error("Error in _handle_new_line: Graph is not initialized or empty.", EXIT_FAILURE);
+        cprintf_error("Error in %s: Graph is not initialized or empty.", __PRETTY_FUNCTION__);
     } else {
         a->down = state->bot_left;
     }
@@ -564,8 +580,8 @@ _link_normal_atom(struct atom *a, struct atom *curr_lower_dummy, int extend_by) 
         curr_lower_dummy = tmp_dum_ptr->right; // First of newly created atoms
     }
     a->down = curr_lower_dummy;
-    last_atom_on_last_line->right = a;
-    a->left = last_atom_on_last_line;
+    state->last_atom_on_last_line->right = a;
+    a->left = state->last_atom_on_last_line;
     return a;
 }
 
@@ -597,9 +613,11 @@ create_atom( bool is_newline ){
     a->left                         = NULL;
     a->up                           = NULL;
     a->down                         = NULL;
-
+    if( NULL == state || is_initialized == false) {
+        cprintf_error("Error in create_atom: Graph is not initialized.", EXIT_FAILURE);
+    }
     //Origin
-    if( NULL == origin ){
+    if( NULL == state->origin ){
         a = _handle_origin_null(a, extend_by);
     }else if(is_newline){
         //a->down = dummy_rows->bot_root;
@@ -754,7 +772,6 @@ calc_actual_width( struct atom *a ){
             snprintf( buf, 4096, a->original_specification, a->val.c_wchar_tx );
         }else{
             cprintf_error("Error in calc_actual_width: Invalid length modifier for \%s", EXIT_FAILURE);
-            assert(0);
         }
     }else if( is(a->conversion_specifier, "d")
           ||  is(a->conversion_specifier, "i") ){
@@ -881,7 +898,7 @@ calc_max_width(){
     if ( NULL == aiter ){
         cprintf_error("Error in calc_max_width: origin is null.", EXIT_FAILURE);
     }
-    diter = state->top_left;
+    diter = top_left_finder_safe();
 
     size_t w = 0;
     while ( NULL != diter){
@@ -910,7 +927,7 @@ calc_max_width(){
 void generate_new_specs(){
     char buf[4099];
     int rc;
-    struct atom *a = state->top_left, *c; //A is the top dummy row.
+    struct atom *a = top_left_finder_safe(), *c; //A is the top dummy row.
     if ( NULL == a ){
         cprintf_error("Error in generate_new_specs: origin is null.", EXIT_FAILURE);
     }
@@ -924,7 +941,9 @@ void generate_new_specs(){
                         c->precision,
                         c->length_modifier,
                         c->conversion_specifier);
-                assert( rc < 4099 );
+                if( rc > 4099 ){
+                    cprintf_error("Error in generate_new_specs: snprintf truncated.", EXIT_FAILURE);
+                }
                 archive( buf, strlen(buf), &(c->new_specification));
             }
             c = c->down;
@@ -944,7 +963,7 @@ calculate_writeback(struct atom * a) {
         } else if (c->ordinary_text) {
             sum += strlen(c->ordinary_text);
         } else {
-            assert(0);
+            cprintf_error("Error in calculate_writeback: atom is neither conversion specification nor ordinary text.", EXIT_FAILURE);
         }
     }
     if (a->val.c_intp != NULL) {
@@ -958,11 +977,12 @@ calculate_writeback(struct atom * a) {
 void
 print_something_already(){
     // bunch of checks to see if Something horrible happened... No dummies.
-    // TODO: REMOVE IN PROD
-    //assert( NULL != origin && NULL != origin->up);
-    struct atom *a = origin, *c;
-    assert( NULL != a);
-    assert( NULL != a->down);
+    // TODO: make this use find_top_left_safe
+    if( NULL == state || NULL == state->origin || NULL == state->origin->up || 
+        NULL == state->origin->down || NULL == state->bot_left) {
+        cprintf_error("Warning in %s: Graph is not initialized.", __PRETTY_FUNCTION__);
+    }
+    struct atom *a = state->origin, *c;
 
     while ( NULL != a && a != state->bot_left) {
         c = a;
@@ -970,25 +990,25 @@ print_something_already(){
             if( c->is_conversion_specification ){
                 switch( c->type ){
                     case C_INT_PTR:             calculate_writeback(c);                                             break;
-                    case C_INT:                 fprintf( dest, c->new_specification, c->val.c_int );                break;
-                    case C_WINT_T:              fprintf( dest, c->new_specification, c->val.c_wint_t );             break;
-                    case C_CHARX:               fprintf( dest, c->new_specification, c->val.c_charx );              break;
-                    case C_WCHAR_TX:            fprintf( dest, c->new_specification, c->val.c_wchar_tx );           break;
-                    case C_LONG:                fprintf( dest, c->new_specification, c->val.c_long );               break;
-                    case C_LONG_LONG:           fprintf( dest, c->new_specification, c->val.c_long_long );          break;
-                    case C_INTMAX_T:            fprintf( dest, c->new_specification, c->val.c_intmax_t );           break;
-                    case C_SSIZE_T:             fprintf( dest, c->new_specification, c->val.c_ssize_t );            break;
-                    case C_PTRDIFF_T:           fprintf( dest, c->new_specification, c->val.c_ptrdiff_t );          break;
-                    case C_UNSIGNED_INT:        fprintf( dest, c->new_specification, c->val.c_unsigned_int );       break;
-                    case C_UNSIGNED_LONG:       fprintf( dest, c->new_specification, c->val.c_unsigned_long );      break;
-                    case C_UNSIGNED_LONG_LONG:  fprintf( dest, c->new_specification, c->val.c_unsigned_long_long ); break;
-                    case C_UINTMAX_T:           fprintf( dest, c->new_specification, c->val.c_uintmax_t );          break;
-                    case C_SIZE_T:              fprintf( dest, c->new_specification, c->val.c_size_t );             break;
-                    case C_DOUBLE:              fprintf( dest, c->new_specification, c->val.c_double );             break;
-                    case C_LONG_DOUBLE:         fprintf( dest, c->new_specification, c->val.c_long_double );        break;
-                    case C_VOIDX:               fprintf( dest, c->new_specification, c->val.c_voidx );              break;
+                    case C_INT:                 fprintf( state->dest, c->new_specification, c->val.c_int );                break;
+                    case C_WINT_T:              fprintf( state->dest, c->new_specification, c->val.c_wint_t );             break;
+                    case C_CHARX:               fprintf( state->dest, c->new_specification, c->val.c_charx );              break;
+                    case C_WCHAR_TX:            fprintf( state->dest, c->new_specification, c->val.c_wchar_tx );           break;
+                    case C_LONG:                fprintf( state->dest, c->new_specification, c->val.c_long );               break;
+                    case C_LONG_LONG:           fprintf( state->dest, c->new_specification, c->val.c_long_long );          break;
+                    case C_INTMAX_T:            fprintf( state->dest, c->new_specification, c->val.c_intmax_t );           break;
+                    case C_SSIZE_T:             fprintf( state->dest, c->new_specification, c->val.c_ssize_t );            break;
+                    case C_PTRDIFF_T:           fprintf( state->dest, c->new_specification, c->val.c_ptrdiff_t );          break;
+                    case C_UNSIGNED_INT:        fprintf( state->dest, c->new_specification, c->val.c_unsigned_int );       break;
+                    case C_UNSIGNED_LONG:       fprintf( state->dest, c->new_specification, c->val.c_unsigned_long );      break;
+                    case C_UNSIGNED_LONG_LONG:  fprintf( state->dest, c->new_specification, c->val.c_unsigned_long_long ); break;
+                    case C_UINTMAX_T:           fprintf( state->dest, c->new_specification, c->val.c_uintmax_t );          break;
+                    case C_SIZE_T:              fprintf( state->dest, c->new_specification, c->val.c_size_t );             break;
+                    case C_DOUBLE:              fprintf( state->dest, c->new_specification, c->val.c_double );             break;
+                    case C_LONG_DOUBLE:         fprintf( state->dest, c->new_specification, c->val.c_long_double );        break;
+                    case C_VOIDX:               fprintf( state->dest, c->new_specification, c->val.c_voidx );              break;
                     default:
-                                                assert(0);
+                                                cprintf_warning("Warning in %s: Invalid type.", __PRETTY_FUNCTION__);
                                                 break;
                 }
             } else if ( c->is_dummy == false ){
@@ -1006,7 +1026,7 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
     const char *p = fmt, *q = fmt;
     ptrdiff_t d = 0;
     ptrdiff_t span;
-    static bool exit_callback_constructed = false;
+    //static bool exit_callback_constructed = false;
 
     if(fileno(stream) == -1) {
         cprintf_error("Error: Invalid stream\n", EXIT_FAILURE);
@@ -1026,14 +1046,11 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
     */
     bool is_newline = true;
 
-    if(is_initialized == false) {
+    if(is_initialized == false || state == NULL || state->dest == NULL) {
         setup(stream);
         is_initialized = true;
     }
 
-    if( state->dest == NULL ){
-        state->dest = stream;
-    }
     if (state->dest != stream){
         cprintf_error("Error: Multiple streams not supported.", EXIT_FAILURE);
     }
@@ -1096,8 +1113,8 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
 
 //Callback for exit() to free memory
 void exit_nice(void){
-    if( NULL != dummy_rows) {
-        free_graph();
+    if( is_initialized == true) {
+        cflush();
     }
     exit(0);
 }
@@ -1136,11 +1153,14 @@ cvfprintf( FILE *stream, const char *fmt, va_list args ){
 
 void
 cflush(){
-    if( NULL != origin){ //Just for safety
-        calc_max_width();
-        generate_new_specs();
-        print_something_already();
-        free_graph();
+    if( is_initialized != false ){
+            calc_max_width();
+            generate_new_specs();
+            print_something_already();
+            free_graph();
+            //cprintf_error("Error in cflush: state is null.", EXIT_FAILURE);
     }
-    dest = NULL;
+    //TODO: Error check these.
+
+    state = NULL; //Think this is already done but can't hurt.
 }
