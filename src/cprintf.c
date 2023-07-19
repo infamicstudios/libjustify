@@ -479,14 +479,17 @@ _free_graph( struct atom *a ){
 
     //TODO: We should still even if something horrible has happened
     //      try to free everything based on what does exist.
-    if(is_initialized == false || NULL == state) {
+    if( false == is_initialized || NULL == state) {
         cprintf_warning("Attempted to free an uninitialized graph.");
     } else if (state->empty_graph == true) {
         cprintf_warning("Attempted to free an empty graph");
+        top_left_finder_safe(); // Fixes state->top_left if it got broken.
     } else if (NULL == state->top_left) {
         cprintf_warning("Attempted to free a graph with a NULL top_left state, this is likely a \
                          bug\n. We will locate origin if it exists and try to free.");
-    } else if (NULL == a) {
+        top_left_finder_safe(); // Fixes state->top_left if it got broken.
+    }
+    if (NULL == a) {
         a = top_left_finder_safe(); // Fixes state->top_left if it got broken.
     }
 
