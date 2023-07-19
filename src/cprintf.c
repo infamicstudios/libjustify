@@ -186,13 +186,29 @@ teardown(void) {
     state->dest = NULL;
 }
 
-// If something horrible happens to the state and it becomes broken in a weird way
-// It's good to check if we can grab an origin somehow and try to start 
-// the _free_graph() process using that alternative origin.
+
+//TODO: Refactor origin_finder_safe() into this to rebuild the state when necessary.
+void 
+rebuild_broken_state(void) {
+    return;
+}
+
+// We check if we can grab a top left but if something horrible happens 
+// to the state and it becomes broken in an unexpected way we want to rebuild the state
+// from whatever is available. And then grab the top left.
+// operate normally. 
+// the _free_graph() / whatever calling process using that alternative origin.
 // NOTE: This is probably not something that will be encountered in practice.
 //       But it's good to have a backup plan in case something goes wrong.
+// TODO: It's a huge can of worms but these are subideal and could probably be improved with a search algorithm.
+// TODO: These are in the order that seems best to me but it's use case dependent.
 struct atom *
 origin_finder_safe (void) {
+    struct atom *a = NULL;
+
+    //rebuild_broken_state(); 
+    //return state->top_left;
+
     if(state != NULL) {
         if( NULL != state->top_left ) {
             return state->top_left;
@@ -205,20 +221,29 @@ origin_finder_safe (void) {
             }
             return state->origin->up;
         } else if( NULL != state->top_right ) {
-            for(struct atom *a = state->top_right; a != NULL; a = a->left) {
+            for(a = state->top_right; a != NULL; a = a->left) {
                 if(NULL == a->left) {
                     return a;
                 }
             }
         } else if( NULL != state->bot_left ) {
-            for(struct atom *a = state->bot_left; a != NULL; a = a->up) {
+            for(a = state->bot_left; a != NULL; a = a->up) {
                 if(NULL == a->up) {
                     return a;
                 }
             }
-        } else if( NULL != state->bot_right ) {
+        } else if( NULL != state->last_atom_on_last_line ) {
+            a = state->last_atom_on_last_line;
+            for(; a->left != NULL; a = a->left)
+            for(; a != NULL; a = a->up) {
+                if(NULL == a->up) {
+                    return a;
+                }
+            }
+        } 
+        else if( NULL != state->bot_right ) {
             struct atom *a = state->bot_right;
-            for(a = state->bot_right; a->right != NULL; a = a->right) //This is gross and shoulden't happen but just in case.
+            for(a = state->bot_right; a->right != NULL; a = a->right) 
             for(; a != NULL; a = a->up) {
                 if(NULL == a->up) {
                     return a;
