@@ -95,19 +95,14 @@ struct atom{
 };
 
 
-// Dummy rows represents the last top and bottom rows of the graph. They are at the corners.
-struct GraphCornerNodes {
-    struct atom *top_right;
-    struct atom *bot_right;
+struct State { //Stores the state of the graph.
+    bool empty_graph;
+    struct atom *last_atom_on_last_line;
+    struct atom *origin; // Stores the origin (first nondummy atom)
+    struct atom *top_right; // Stores the root (furthest right) of the top row.
+    struct atom *bot_right; // Stores the root (furthest right) of the bottom row.
     struct atom *top_left; // Stores the root (furthest left) of the top row. 
     struct atom *bot_left; // Stores the root (furthest left) of the bottom row. 
-};
-
-
-struct State { //Stores the state of the program.
-    struct atom *last_atom_on_last_line;
-    struct atom *origin;
-    struct GraphCornerNodes *dummy_rows;
     FILE *dest;
 };
 
@@ -133,35 +128,61 @@ ptrdiff_t parse_field_width( const char *p );
 ptrdiff_t parse_precision( const char *p );
 ptrdiff_t parse_length_modifier( const char *p );
 ptrdiff_t parse_conversion_specifier( const char *p );
+
+void calculate_writeback(struct atom *a);
 void archive( const char *p, ptrdiff_t span, char **q );
 bool is( char *p, const char *q );
 void _cprintf( FILE *stream, const char *fmt, va_list *args );
 
 void exit_nice(void);
+
 void cprintf_error( char *err_msg, int err_code );
 void cprintf_warning( char *err_msg );
-void calculate_writeback(struct atom *a);
+
 
 void setup(FILE *stream);
+void teardown(void);
 
-// Might be nice to take these and turn them into their
-// own struct called state or something.
-static struct atom *last_atom_on_last_line = NULL;
-static struct atom *origin = NULL;
-static struct GraphCornerNodes *dummy_rows = NULL;
-static FILE *dest = NULL;
+static struct State *state = NULL;
+static bool is_initialized = false;
 
-
-/*void
+void
 setup(FILE *stream){
-    struct State *state = calloc(1, sizeof(struct State));
+    static bool callback_registered = false;
+    state = calloc(1, sizeof(struct State));
     if (NULL == state) {
         cprintf_error("Memory allocation failed.", EXIT_FAILURE);
     }
-    *state = (struct State){NULL, NULL, NULL, stream};
-}*/
 
+    state->empty_graph            = true;
+    state->last_atom_on_last_line = NULL;
+    state->origin                 = NULL;
+    state->dest                   = stream;
 
+    state->top_left               = NULL;
+    state->top_right              = NULL;
+    state->bot_left               = NULL;
+    state->bot_right              = NULL;
+
+    //Register the exit call back
+    if( callback_registered == false ){
+        atexit( exit_nice );
+        callback_registered = true;
+    }
+}
+
+void 
+teardown(void) {
+    is_initialized = false;
+    state->top_left = NULL;
+    state->bot_left = NULL;
+    state->top_right = NULL;
+    state->bot_right = NULL;
+    state->empty_graph = true;
+    state->last_atom_on_last_line = NULL;
+    state->origin = NULL;
+    state->dest = NULL;
+}
 struct atom *
 _make_dummy( void ) {
     struct atom *a = calloc( sizeof( struct atom ), 1 );
@@ -194,20 +215,18 @@ _make_dummy( void ) {
     return a;
 };
 
-
-void
-_create_dummy_rows(void){
-    dummy_rows = calloc(1, sizeof(struct GraphCornerNodes));
-    if (NULL == dummy_rows) {
-        cprintf_error("Memory allocation failed.", EXIT_FAILURE);
-    }
-}
-
-
 void
 _extend_dummy_rows(size_t size) {
     struct atom * new_top;
     struct atom * new_bottom;
+
+    if( NULL == state ) {
+        cprintf_error("_extend_dummy_rows: Attempted to extend with an unititialized graph.", EXIT_FAILURE);
+    }
+
+    if( size == 0 ) {
+        cprintf_error("Attempted to extend dummy rows by 0.", EXIT_FAILURE); // Maybe this should be a warning?
+    }
 
     for (; size != 0; --size){
         new_top = _make_dummy();
@@ -219,29 +238,21 @@ _extend_dummy_rows(size_t size) {
 
         new_top->down = new_bottom;
         new_bottom->up = new_top;
+        //struct atom *old_rows = state->dummy_rows;
+        if ( state->empty_graph ){ //This gets set in _cprintf()
 
-        if (NULL == dummy_rows){
-            _create_dummy_rows();
+            state->top_left = new_top;
+            state->bot_left = new_bottom;
 
-            if(NULL == dummy_rows){ //Double check, can't hurt.
-                cprintf_error("Memory allocation failed.", EXIT_FAILURE);
-            }
-
-            dummy_rows->bot_left = new_bottom;
-            dummy_rows->top_left = new_top;
         } else {
-            new_top->left = dummy_rows->top_right;
-            new_bottom->left = dummy_rows->bot_right;
-            dummy_rows->top_right->right = new_top;
-            dummy_rows->bot_right->right = new_bottom;
+            new_top->left = state->top_right;
+            new_bottom->left = state->bot_right;
+            state->top_right->right = new_top;
+            state->bot_right->right = new_bottom;
         }
 
-        if( NULL == dummy_rows ){
-            cprintf_error("Memory allocation failed.", EXIT_FAILURE);
-        }
-
-        dummy_rows->top_right = new_top;
-        dummy_rows->bot_right = new_bottom;
+        state->top_right = new_top;
+        state->bot_right = new_bottom;
     }
 };
 
@@ -249,12 +260,12 @@ _extend_dummy_rows(size_t size) {
 void
 dump_graph( void ){
 
-    if (NULL == origin || NULL == dummy_rows || NULL == dummy_rows->top_left){
-        cprintf_warning("Dump graph called on empty graph.");
+    if( false == is_initialized || NULL == state || false == state->empty_graph || NULL == state->top_left ){
+        cprintf_warning("Attempted to an dump an empty / uninitialized graph.");
         return;
     }
 
-    struct atom *a = dummy_rows->top_left, *c;
+    struct atom *a = state->top_left, *c;
 
     while( NULL != a ){
         // Address of this atom.
@@ -357,14 +368,20 @@ void cprintf_warning(char *err_msg){
 //TODO CLEAN THIS UP. USING DUMMY_ROWS->UPPER AS THE ROOT OF THE UPPER IS VERY HACKY.
 void
 _free_graph( struct atom *a ){
+
+    //TODO: We should still even if something horrible has happened
+    //      try to free everything based on what does exist.
+    if(is_initialized == false || NULL == state || state->empty_graph == true) {
+        cprintf_warning("Attempted to free an empty / uninitialized graph.");
+    }
     // Check to see if any graph exists.
-    if( NULL == dummy_rows->top_left){
+    if( NULL == state->top_left){
         return;
     }
 
     // Starts the process.
     if( NULL == a ){
-        a = dummy_rows->top_left;
+        a = state->top_left;
     }
 
     // Find the rightmost atom in the top line.
@@ -379,8 +396,8 @@ _free_graph( struct atom *a ){
 
     // If we're at the point where we're looking at the atom in the top left
     // corner, we're done.
-    if (a == origin){
-        origin = NULL;
+    if (a == state->top_left){
+        teardown();
     }
 
     // If there's an atom above us, disconnect from it.
@@ -408,9 +425,15 @@ _free_graph( struct atom *a ){
 
 void
 free_graph(){
-    _free_graph( origin->up ); //Go to the dummy row. This is kinda convoluted
-    free( dummy_rows );
-    dummy_rows = NULL;
+    //We give an error message in _free_graph() but here we should try to free up stuff 
+    // In the event something horrible has happened.
+    if(state == NULL || state->empty_graph == true) {
+        cprintf_warning("Attempted to free an uninitialized graph.");
+        return;
+    }
+    _free_graph( state->top_left ); //Go to the dummy row. This is kinda convoluted
+    free( state );
+    state = NULL;
 }
 
 //NOTE: It's probably better to build the first row of true atoms and
@@ -422,8 +445,14 @@ _handle_origin_null(struct atom *a, int extend_by) {
         cprintf_error("Error in _handle_origin_null: Atom passed in is NULL.", EXIT_FAILURE);
     }
     _extend_dummy_rows(extend_by);
-    a->down = dummy_rows->bot_left;
-    origin = a;
+    a->down = state->bot_left;
+
+    if( NULL == state->origin ){
+        state->origin = a;
+    } else {
+        cprintf_error("Error in _handle_origin_null: Origin is not NULL (somehow).", EXIT_FAILURE);
+    }
+
     return a;
 }
 
@@ -432,17 +461,21 @@ _handle_new_line(struct atom *a) {
     if( NULL == a ){
         cprintf_error("Error in _handle_new_line: Atom passed in is NULL.", EXIT_FAILURE);
     }
-    a->down = dummy_rows->bot_left;
+    if( NULL == state || NULL == state->bot_left ) {
+        cprintf_error("Error in _handle_new_line: Graph is not initialized or empty.", EXIT_FAILURE);
+    } else {
+        a->down = state->bot_left;
+    }
     return a;
 }
 
 struct atom*
 _link_normal_atom(struct atom *a, struct atom *curr_lower_dummy, int extend_by) {
-    if( NULL == a ){
-        cprintf_error("Error in _link_normal_atom: Atom passed in is NULL.", EXIT_FAILURE);
+    if( NULL == state || NULL == state->bot_left ) {
+        cprintf_error("Error in _link_normal_atom: Graph is not in the expected state.", EXIT_FAILURE);
     }
     if(curr_lower_dummy == NULL) {
-        struct atom * tmp_dum_ptr = dummy_rows->bot_right; // Store so we can attach to later.
+        struct atom * tmp_dum_ptr = state->bot_right; // Store so we can attach to later.
         _extend_dummy_rows(extend_by);
         curr_lower_dummy = tmp_dum_ptr->right; // First of newly created atoms
     }
@@ -491,14 +524,14 @@ create_atom( bool is_newline ){
         // NOTE: It also MIGHT be more efficient during extension to create a
         //       anticipated dummies.
 
-        curr_lower_dummy = last_atom_on_last_line->down->right;
+        curr_lower_dummy = state->last_atom_on_last_line->down->right;
         a = _link_normal_atom(a, curr_lower_dummy, extend_by);
     }
 
     a->up = a->down->up;
     a->up->down = a;
     a->down->up = a;
-    last_atom_on_last_line = a;
+    state->last_atom_on_last_line = a;
 
     return a;
 }
@@ -753,15 +786,18 @@ calc_actual_width( struct atom *a ){
     a->original_field_width = strlen( buf );
 }
 
+//TODO: Not super happy with the way this is set up. It's a little convoluted.
 void
 calc_max_width(){
     // Really can't remember why I put this here but it can't hurt
-    assert( dummy_rows != NULL ); 
-    struct atom *aiter = origin, *citer, *diter; //A is the top dummy
+    if( NULL == state ){
+        cprintf_error("Error in calc_max_width: state/empty is null.", EXIT_FAILURE);
+    }
+    struct atom *aiter = state->origin, *citer, *diter; //A is the top dummy
     if ( NULL == aiter ){
         cprintf_error("Error in calc_max_width: origin is null.", EXIT_FAILURE);
     }
-    diter = dummy_rows->top_left;
+    diter = state->top_left;
 
     size_t w = 0;
     while ( NULL != diter){
@@ -790,7 +826,7 @@ calc_max_width(){
 void generate_new_specs(){
     char buf[4099];
     int rc;
-    struct atom *a = dummy_rows->top_left, *c; //A is the top dummy row.
+    struct atom *a = state->top_left, *c; //A is the top dummy row.
     if ( NULL == a ){
         cprintf_error("Error in generate_new_specs: origin is null.", EXIT_FAILURE);
     }
@@ -844,7 +880,7 @@ print_something_already(){
     assert( NULL != a);
     assert( NULL != a->down);
 
-    while ( NULL != a && a != dummy_rows->bot_left) {
+    while ( NULL != a && a != state->bot_left) {
         c = a;
         while ( NULL != c) {
             if( c->is_conversion_specification ){
@@ -906,17 +942,21 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
     */
     bool is_newline = true;
 
-    if( dest == NULL ){
-        dest = stream;
+    if(is_initialized == false) {
+        setup(stream);
+        is_initialized = true;
     }
 
-    if (dest != stream){
+    if( state->dest == NULL ){
+        state->dest = stream;
+    }
+    if (state->dest != stream){
         cprintf_error("Error: Multiple streams not supported.", EXIT_FAILURE);
     }
 
     if( !exit_callback_constructed ){
         exit_callback_constructed = true;
-        atexit( exit_nice ); // Set exit Callback
+         // Set exit Callback
     }
 
     while( *p != '\0' ){
