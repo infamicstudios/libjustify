@@ -510,6 +510,7 @@ _free_graph( struct atom *a ){
     // If top_left got broken, 
     if (a == state->top_left){ 
         state->origin = NULL;
+        state->top_left = NULL;
     }
 
     // If there's an atom above us, disconnect from it.
@@ -1184,6 +1185,7 @@ cflush(){
             generate_new_specs();
             print_something_already();
             free_graph();
+            teardown();
     }
 
     state = NULL; //Think this is already done but can't hurt.
