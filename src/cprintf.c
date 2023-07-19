@@ -270,7 +270,7 @@ struct atom
         }
         rv = state->top_left;
     }
-    return state->top_left;
+    return rv;
 }
 
 struct atom *
