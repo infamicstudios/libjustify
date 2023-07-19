@@ -171,6 +171,8 @@ setup(FILE *stream){
     }
 }
 
+
+// Reset the state of the graph, this should be called after the graph is freed.
 void 
 teardown(void) {
     is_initialized = false;
@@ -183,6 +185,51 @@ teardown(void) {
     state->origin = NULL;
     state->dest = NULL;
 }
+
+// If something horrible happens to the state and it becomes broken in a weird way
+// It's good to check if we can grab an origin somehow and try to start 
+// the _free_graph() process using that alternative origin.
+// NOTE: This is probably not something that will be encountered in practice.
+//       But it's good to have a backup plan in case something goes wrong.
+struct atom *
+origin_finder_safe (void) {
+    if(state != NULL) {
+        if( NULL != state->top_left ) {
+            return state->top_left;
+        } else if( NULL != state->origin ) {
+            cprintf_warning("State is in an invalid 'state' but the origin is still valid.");
+            if(NULL == state->origin->up) {
+                cprintf_warning("Error in origin_finder_safe: State is in an invalid 'state'\
+                    and the top dummies are not linked");
+                return state->origin;
+            }
+            return state->origin->up;
+        } else if( NULL != state->top_right ) {
+            for(struct atom *a = state->top_right; a != NULL; a = a->left) {
+                if(NULL == a->left) {
+                    return a;
+                }
+            }
+        } else if( NULL != state->bot_left ) {
+            for(struct atom *a = state->bot_left; a != NULL; a = a->up) {
+                if(NULL == a->up) {
+                    return a;
+                }
+            }
+        } else if( NULL != state->bot_right ) {
+            struct atom *a = state->bot_right;
+            for(a = state->bot_right; a->right != NULL; a = a->right) //This is gross and shoulden't happen but just in case.
+            for(; a != NULL; a = a->up) {
+                if(NULL == a->up) {
+                    return a;
+                }
+            }
+        } 
+        cprintf_error("Error in origin_finder_safe: State is in an invalid 'state'\
+            and the origin could not be located through any means", EXIT_FAILURE);
+    }
+}
+
 struct atom *
 _make_dummy( void ) {
     struct atom *a = calloc( sizeof( struct atom ), 1 );
@@ -260,12 +307,24 @@ _extend_dummy_rows(size_t size) {
 void
 dump_graph( void ){
 
-    if( false == is_initialized || NULL == state || false == state->empty_graph || NULL == state->top_left ){
-        cprintf_warning("Attempted to an dump an empty / uninitialized graph.");
+    struct atom *a;
+    struct atom *c;
+
+    if( false == is_initialized || NULL == state ){
+        cprintf_warning("Attempted to an dump an uninitialized graph.");
         return;
     }
 
-    struct atom *a = state->top_left, *c;
+    if( false == state->empty_graph){
+        cprintf_warning("Attempted to an dump an empty graph.");
+        return;
+    }
+    if( state->top_left == NULL){
+        cprintf_warning("State configuration (top_left is somehow broken) attempting to find origin.");
+        a = origin_finder_safe(), *c;
+    } else {
+        a = state->top_left, *c;
+    }
 
     while( NULL != a ){
         // Address of this atom.
@@ -371,16 +430,16 @@ _free_graph( struct atom *a ){
 
     //TODO: We should still even if something horrible has happened
     //      try to free everything based on what does exist.
-    if(is_initialized == false || NULL == state || state->empty_graph == true) {
+    if(is_initialized == false || NULL == state) {
         cprintf_warning("Attempted to free an empty / uninitialized graph.");
-    }
-    // Check to see if any graph exists.
-    if( NULL == state->top_left){
+    } else if (state->empty_graph == true) {
+        cprintf_warning("Attempted to free an empty graph");
         return;
-    }
-
-    // Starts the process.
-    if( NULL == a ){
+    } else if (NULL == state->top_left) {
+        cprintf_warning("Attempted to free a graph with a NULL top_left state, this is likely a \
+                         bug\n. We will locate origin if it exists and try to free.");
+        a = origin_finder_safe();
+    } else if (NULL == a) {
         a = state->top_left;
     }
 
@@ -397,7 +456,7 @@ _free_graph( struct atom *a ){
     // If we're at the point where we're looking at the atom in the top left
     // corner, we're done.
     if (a == state->top_left){
-        teardown();
+        teardown(); // Reset the state of the graph.
     }
 
     // If there's an atom above us, disconnect from it.
