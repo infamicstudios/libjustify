@@ -117,6 +117,8 @@ struct atom * _handle_origin_null( struct atom *a, int extend_by);
 struct atom * _handle_new_line(struct atom *a);
 struct atom * _link_normal_atom(struct atom *a, struct atom *curr_lower_dummy, int extend_by);
 
+struct atom * top_left_finder_safe (void);
+
 //Enumerate methods to handle dummy rows.
 void _create_dummy_rows(void);
 struct atom * _make_dummy( void);
@@ -142,6 +144,8 @@ void cprintf_warning( char *fmt, ...);
 
 void setup(FILE *stream);
 void teardown(void);
+void update_corners(struct atom* a, struct atom** top_left, struct atom** top_right, 
+                    struct atom** bot_left, struct atom** bot_right);
 
 static struct State *state = NULL;
 static bool is_initialized = false;
@@ -189,92 +193,85 @@ teardown(void) {
     state = NULL;
 }
 
-
-
+// Rebuild the state if something horrible happens.
 void 
-rebuild_broken_state(void) {
-    return;
+rebuild_state(struct atom *a) {
+
+
+    struct atom* top_left = NULL;
+    struct atom* top_right = NULL;
+    struct atom* bot_left = NULL;
+    struct atom* bot_right = NULL;
+
+    while (a == NULL) {
+        if (state->top_left) {
+            a = state->top_left;
+        } else if (state->top_right) {
+            a = state->top_right;
+        } else if (state->bot_left) {
+            a = state->bot_left;
+        } else if (state->bot_right) {
+            a = state->bot_right;
+        } else {
+            cprintf_error("State has no corners to rebuild from.");
+        }
+        update_corners(a, &top_left, &top_right, &bot_left, &bot_right);
+    }
+
+    // Update the state
+    state->top_left = (top_left) ? top_left : state->top_left;
+    state->top_right = (top_right) ? top_right : state->top_right;
+    state->bot_left = (bot_left) ? bot_left : state->bot_left;
+    state->bot_right = (bot_right) ? bot_right : state->bot_right;
+
+    // Also update the origin if needed
+    state->origin = top_left ? top_left->down : NULL;
 }
 
-// We check if we can grab a top left validating it's a dummy. If something unexpected happens 
-// to the state and it's become broken, we want to locate and reassign the top left however possible to let
-// use print and flush.
-// NOTE: This is probably not something that will be encountered in practice.
-//       But it's good to have a backup plan in case something goes wrong.
-//TODO:  Refactor into rebuild_broken_state() which can rebuild the entire state.
-//       There's probably a clever algorithmic way to do that.
+// Recursive function to update the corners
+// TODO: Maybe a search algorithm would be better?
+//       THIS IS EXPENSIVE AND SHOULDN"T OCCUR.
+void update_corners(struct atom* a, struct atom** top_left, struct atom** top_right, 
+                    struct atom** bot_left, struct atom** bot_right) {
+    // If atom is NULL or all corners have been found, exit.
+    if (!a || (*top_left && *top_right && *bot_left && *bot_right)) return;
 
-struct atom *
-top_left_finder_safe (void) {
-    struct atom *a = NULL;
-    struct atom *new_top_left = NULL;
+    // If current atom is a dummy and at the edge, update the respective corner
+    if (a->is_dummy) {
+        if (!a->up && !a->left && !*top_left) *top_left = a;
+        if (!a->up && !a->right && !*top_right) *top_right = a;
+        if (!a->down && !a->left && !*bot_left) *bot_left = a;
+        if (!a->down && !a->right && !*bot_right) *bot_right = a;
+    }
 
-    static char *TOP_LEFT = "top_left";
-    static char *ORIGIN = "origin";
-    static char *TOP_RIGHT = "top_right";
-    static char *BOT_LEFT = "bot_left";
-    static char *BOT_RIGHT = "bot_right";
-    static char *LAST_ATOM_LAST_LINE = "last_atom_on_last_line";
-    static char *STATE = "State";
+    // Recursive calls
+    update_corners(a->left, top_left, top_right, bot_left, bot_right);
+    update_corners(a->right, top_left, top_right, bot_left, bot_right);
+    update_corners(a->up, top_left, top_right, bot_left, bot_right);
+    update_corners(a->down, top_left, top_right, bot_left, bot_right);
+}
 
-    while( NULL == new_top_left) {
-        if( NULL != state->top_left) {
-            return state->top_left; // This is the best case scenario. 
-        } else if( NULL != state->origin ) {
-
-            cprintf_warning(
-                            "%s lacks: { %s } but the %s was located.", 
-                            STATE, TOP_LEFT, ORIGIN);
-            new_top_left = (NULL != state->origin->up) ? state->origin->up : state->origin;
-
-        } else if( NULL != state->top_right) {
-
-            cprintf_warning(
-                            "%s lacks: { %s, %s } but the %s was located.", 
-                            STATE, TOP_LEFT, ORIGIN, TOP_RIGHT);
-            for( a = state->top_right; a->left != NULL; a = a->left) {}
-            new_top_left = a;
-
-        } else if( NULL != state->bot_left) {
-
-            cprintf_warning(
-                            "%s lacks: { %s, %s, %s } but the %s was located.", 
-                             STATE, TOP_LEFT, ORIGIN, TOP_RIGHT, BOT_LEFT);
-            for(a = state->bot_left; a->up != NULL; a = a->up) {}
-            new_top_left = a;
-
-        } else if( NULL != state->last_atom_on_last_line ) {
-
-            cprintf_warning(
-                            "%s lacks: { %s, %s, %s, %s } but the %s was located.", 
-                            STATE, TOP_LEFT, ORIGIN, TOP_RIGHT, BOT_LEFT, LAST_ATOM_LAST_LINE);
-            for(a = state->last_atom_on_last_line; a->left != NULL; a = a->left){}
-            for(; a->up != NULL; a = a->up) {}
-            new_top_left = a;
-
-        } 
-        else if( NULL != state->bot_right ) {
-
-            cprintf_warning(
-                            "%s lacks: { %s, %s, %s, %s, %s } but the %s was located.", 
-                            STATE, TOP_LEFT, ORIGIN, TOP_RIGHT, BOT_LEFT, LAST_ATOM_LAST_LINE, BOT_RIGHT);
-            for(a = state->bot_right; a->left != NULL; a = a->left) {}
-            for(; a->up != NULL; a = a->up) {}
-            new_top_left = a;
-
-        } else {
-            cprintf_error(
-                          "%s is invalid and the %s couldn't be located.", 
-                          STATE, TOP_LEFT);
+// We often start from the top left,
+// The safest way to do this is to verify the state is 
+// In a valid configuration and rebuild if it isn't.
+struct atom 
+*top_left_finder_safe(void){
+    struct atom *rv = NULL;
+    if(NULL == state) {
+        cprintf_error("State is NULL. Top left cannot be located.");
+    } else if(NULL == state->top_left) {
+        cprintf_warning("State->top_left is NULL. Configuration will be rebuilt.");
+        rebuild_state(0);
+    } else {
+        if(state->top_left->is_dummy == false && state->top_left->down == state->origin) {
+            cprintf_warning("Error in top_left_finder_safe: %s was located \
+                          but does not appear to be a dummy atom or an origin\
+                          Configuration will be rebuilt.", "top_left");
+            rebuild_state(0);
         }
+        rv = state->top_left;
     }
-    if(new_top_left->is_dummy == false) {
-        cprintf_error("Error in origin_finder_safe: %s was located but does not appear to be a dummy atom.", TOP_LEFT, EXIT_FAILURE);
-    }
-
-    state->top_left = new_top_left;
-
-    return new_top_left;
+    return state->top_left;
 }
 
 struct atom *
