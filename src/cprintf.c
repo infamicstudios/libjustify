@@ -954,11 +954,6 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
         cprintf_error("Error: Multiple streams not supported.", EXIT_FAILURE);
     }
 
-    if( !exit_callback_constructed ){
-        exit_callback_constructed = true;
-         // Set exit Callback
-    }
-
     while( *p != '\0' ){
         d = strcspn( p, "%" );
         q = p;
