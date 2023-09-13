@@ -1178,7 +1178,6 @@ void exit_nice(void){
     if( is_initialized == true) {
         cflush();
     }
-    assert(0);
     exit(0);
 }
 
