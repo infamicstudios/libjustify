@@ -108,8 +108,8 @@ TEST_F(Strings_Two_lines, Test3) {
     cflush();
     const char* cprintf_output = GetOutput();
 
-    fprintf(stdout, "Hello             world!");
-    fprintf(stdout, "It works on my  machine!");
+    fprintf(stdout, "Hello             world!\n");
+    fprintf(stdout, "It works on my machine!\n");
     const char* printf_output = GetOutput();
 
     ASSERT_STREQ(cprintf_output, printf_output);
@@ -124,72 +124,39 @@ TEST_F(Test_Two_line_Integer_and_Float, Test4) {
     cflush();
     const char* cprintf_output = GetOutput();
 
+    fprintf(stdout, "   1        2            3\n");
     fprintf(stdout, "%f %f %e\n", 3.14159, 1.618033, 299792458.0);
-    fprintf(stdout, "   1        2            3");
     const char* printf_output = GetOutput();
 
-    ASSERT_STREQ(cprintf_output, printf_output);
-    
+    ASSERT_STREQ(cprintf_output, printf_output); 
 }
 
 
-void print_children(unsigned int i) {
-    unsigned ARR_SIZE = 32;
+class TestBackToBack : public OutputTest {};
 
-    if( i == 0 ) {
-        cprintf("%s %s %s %s\n", "Threads", "HWThread", "Core", "Socket");
-    }
+TEST_F(TestBackToBack, Test5) {
+  printtestHeader(7);
+  cprintf("%s%s x %s\n", "hello to everybody", "world", "!!!");
+  cprintf("%#08x %08x\n", 4096, 1024);
+  cprintf("%4d.%02d\n", 2048, 31);
+  cfprintf(stdout, "%d%d %d\n", 1, 2, 3);
+  cfprintf(stdout, "%f %f%e\n", 3.14159, 1.618033, 299792458.0);
+  cprintf("%s %s%s %s\n", "Threads", "HWThread", "Core", "Socket");
+  cflush();
+  const char* cprintf_output = GetOutput();
 
-    int socket = (i > ARR_SIZE/2) % 2;
-    cfprintf(stdout, "%d %d %d %d\n", i, i, i, socket);
 
-    i = i+1;
-    if (i < ARR_SIZE) {
-        print_children(i);
-    } else {
-        cflush();
-    }
-    
+  fprintf(stdout, "hello to everybodyworld x !!!\n");
+  fprintf(stdout, "0x001000 00000400\n");
+  fprintf(stdout, "2048.31\n");
+  fprintf(stdout, "12 3\n");
+  fprintf(stdout, "3.141590 1.6180332.997925e+08\n");
+  fprintf(stdout, "Threads HWThreadCore Socket\n");
+  const char* printf_output = GetOutput();
+
+  ASSERT_STREQ(cprintf_output, printf_output);
 }
 
-class TestTopology : public OutputTest {};
-
-TEST_F(TestTopology, Test5) {
-    printtestHeader(5);
-    const char *hostname = "quartz1234";
-    int num_sockets = 2;
-    int num_cores_per_socket = 18;
-    int total_cores = num_sockets * num_cores_per_socket;
-    int total_Threads = 36;
-    int threads_per_core = 2;
-
-
-    cfprintf(stdout, "=================\n");
-    cfprintf(stdout, "Platform Topology\n");
-    cfprintf(stdout, "=================\n");
-    cflush();
-    cfprintf(stdout, "%-s: %s\n", "Hostname", hostname);
-    //cfprintf(stdout, "Num Sockets: %d\n", num_sockets);
-    cfprintf(stdout, "%-s: %d\n", "Num Cores per Socket", num_cores_per_socket);
-
-    if ( threads_per_core == 1)
-    {
-        cfprintf(stdout, "%-s: %s\n", "  Hyperthreading", "No");
-    }
-    else
-    {
-        cfprintf(stdout, "%-s: %s\n", "  Hyperthreading", "Yes");
-    }
-
-    cfprintf(stdout, "\n");
-    cfprintf(stdout, "%-s: %d\n", "Total Num of Cores", total_cores);
-    cfprintf(stdout, "%-s: %d\n", "Total Num of Threads", total_Threads);
-    cfprintf(stdout, "\n");
-    cfprintf(stdout, "Layout:\n");
-    cfprintf(stdout, "-------\n");
-    cflush();
-    print_children(0);
-}
 
 int main(int argc, char **argv) {
 
