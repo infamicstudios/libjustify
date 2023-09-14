@@ -68,6 +68,8 @@ struct atom{
     // added here are explicitly set to NULL in create_atom() and freed
     // in free_graph();
     bool is_conversion_specification;
+    bool is_dummy;
+
     size_t original_field_width;
     size_t new_field_width;
 
@@ -79,9 +81,7 @@ struct atom{
     char *precision;
     char *length_modifier;
     char *conversion_specifier;
-
     char *ordinary_text;
-    bool is_dummy;
 
     va_list *pargs;
     type_t type;
@@ -94,15 +94,15 @@ struct atom{
     struct atom *down;
 };
 
-
-struct State { //Stores the state of the graph.
+//Stores the state of the graph.
+struct State {
     bool empty_graph;
     struct atom *last_atom_on_last_line;
     struct atom *origin; // Stores the origin (first nondummy atom)
     struct atom *top_right; // Stores the root (furthest right) of the top row.
     struct atom *bot_right; // Stores the root (furthest right) of the bottom row.
-    struct atom *top_left; // Stores the root (furthest left) of the top row. 
-    struct atom *bot_left; // Stores the root (furthest left) of the bottom row. 
+    struct atom *top_left; // Stores the root (furthest left) of the top row.
+    struct atom *bot_left; // Stores the root (furthest left) of the bottom row.
     FILE *dest;
 };
 
@@ -117,6 +117,8 @@ struct atom * _handle_origin_null( struct atom *a, int extend_by);
 struct atom * _handle_new_line(struct atom *a);
 struct atom * _link_normal_atom(struct atom *a, struct atom *curr_lower_dummy, int extend_by);
 
+void update_corners(struct atom* a, struct atom** top_left, struct atom** top_right,
+                    struct atom** bot_left, struct atom** bot_right);
 struct atom * top_left_finder_safe (void);
 
 //Enumerate methods to handle dummy rows.
@@ -141,15 +143,13 @@ void exit_nice(void);
 void cprintf_error( char *fmt, ...);
 void cprintf_warning( char *fmt, ...);
 
-
 void setup(FILE *stream);
 void teardown(void);
-void update_corners(struct atom* a, struct atom** top_left, struct atom** top_right, 
-                    struct atom** bot_left, struct atom** bot_right);
 
 static struct State *state = NULL;
 static bool is_initialized = false;
 static bool do_tabulate    = true;
+
 
 void
 setup(FILE *stream){
@@ -179,7 +179,7 @@ setup(FILE *stream){
 
 
 // Reset the state of the graph, this should be called after the graph is freed.
-void 
+void
 teardown(void) {
 
     is_initialized = false;
@@ -195,8 +195,9 @@ teardown(void) {
     state = NULL;
 }
 
+
 // Rebuild the state if something horrible happens.
-void 
+void
 rebuild_state(struct atom *a) {
 
     struct atom* top_left = NULL;
@@ -204,7 +205,7 @@ rebuild_state(struct atom *a) {
     struct atom* bot_left = NULL;
     struct atom* bot_right = NULL;
 
-    //Grab any corner we can locate 
+    //Grab any corner we can locate
     if (state->top_left) {
         a = state->top_left;
     } else if (state->top_right) {
@@ -229,10 +230,12 @@ rebuild_state(struct atom *a) {
     state->origin = state->origin ? state->origin : top_left->down;
 }
 
+
 // Recursive function to update the corners
 // TODO: Maybe a search algorithm would be better?
 // NOTE: THIS IS EXPENSIVE AND SHOULDN'T OCCUR.
-void update_corners(struct atom* a, struct atom** top_left, struct atom** top_right, 
+void
+update_corners(struct atom* a, struct atom** top_left, struct atom** top_right,
                     struct atom** bot_left, struct atom** bot_right) {
     // If atom is NULL or all corners have been found, exit.
     if (!a || (*top_left && *top_right && *bot_left && *bot_right)) return;
@@ -252,11 +255,12 @@ void update_corners(struct atom* a, struct atom** top_left, struct atom** top_ri
     update_corners(a->down, top_left, top_right, bot_left, bot_right);
 }
 
+
 // We often start from the top left,
-// The safest way to do this is to verify the state is 
+// The safest way to do this is to verify the state is
 // In a valid configuration and rebuild if it isn't.
-struct atom 
-*top_left_finder_safe(void){
+struct atom *
+top_left_finder_safe(void){
     struct atom *rv = NULL;
     if(NULL == state) {
         cprintf_error("State is NULL. Top left cannot be located.");
@@ -274,6 +278,7 @@ struct atom
     }
     return rv;
 }
+
 
 struct atom *
 _make_dummy( void ) {
@@ -317,11 +322,9 @@ _extend_dummy_rows(size_t size) {
         cprintf_error("_extend_dummy_rows: Attempted to extend with an unititialized graph.", EXIT_FAILURE);
     }
 
-
     if( size == 0 ) {
         return;
     } else {
-
         new_top = _make_dummy();
         new_bottom = _make_dummy();
 
@@ -331,13 +334,11 @@ _extend_dummy_rows(size_t size) {
 
         new_top->down = new_bottom;
         new_bottom->up = new_top;
-        //struct atom *old_rows = state->dummy_rows;
-        if ( state->empty_graph ){ //This gets set in _cprintf()
 
+        if ( state->empty_graph ){ //This gets set in _cprintf()
             state->top_left = new_top;
             state->bot_left = new_bottom;
             state->empty_graph = false;
-
         } else {
             new_top->left = state->top_right;
             new_bottom->left = state->bot_right;
@@ -349,7 +350,6 @@ _extend_dummy_rows(size_t size) {
         state->bot_right = new_bottom;
 
         _extend_dummy_rows(--size);
-
     }
 };
 
@@ -450,22 +450,20 @@ dump_graph( void ){
 }
 
 
-void cprintf_error(char *fmt, ...) {
+void
+cprintf_error(char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     fprintf(stderr, "ERROR: ");
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
     va_end(args);
-    //TODO: Could try to rebuild the state in here
-    //rebuild_state(0); // this will throw it's own errors if it fails.
-    //free_graph();
-    teardown();
-    exit(EXIT_FAILURE);
+    exit_nice();
 }
 
 
-void cprintf_warning(char *fmt, ...) {
+void
+cprintf_warning(char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
     fprintf(stderr, "WARNING: ");
@@ -477,7 +475,6 @@ void cprintf_warning(char *fmt, ...) {
 
 void
 _free_graph( struct atom *a ){
-
     //TODO: We should still even if something horrible has happened
     //      try to free everything based on what does exist.
     if( false == is_initialized || NULL == state) {
@@ -487,7 +484,7 @@ _free_graph( struct atom *a ){
         top_left_finder_safe(); // Fixes state->top_left if it got broken.
     } else if (NULL == state->top_left) {
         cprintf_warning("Attempted to free a graph with a NULL top_left state, this is likely a \
-                         bug\n. We will locate origin if it exists and try to free.");
+                         bug\n. Libjustify will locate origin if it exists and try to free.");
         top_left_finder_safe(); // Fixes state->top_left if it got broken.
     }
     if (NULL == state->origin) {
@@ -509,8 +506,7 @@ _free_graph( struct atom *a ){
 
     // If we're at the point where we're looking at the atom in the top left
     // corner, we're done.
-    // If top_left got broken, 
-    if (a == state->top_left){ 
+    if (a == state->top_left){
         state->origin = NULL;
         state->top_left = NULL;
     }
@@ -525,12 +521,13 @@ _free_graph( struct atom *a ){
         a->left->right = NULL;
     }
     if (do_tabulate == false ) {
-      // point to the some thing 
+      // point to the some thing (Hacky)
       free( a->original_specification );
     } else {
       free( a->original_specification );
       free( a->new_specification );
     }
+
     free( a->flags );
     free( a->field_width );
     free( a->precision );
@@ -542,10 +539,12 @@ _free_graph( struct atom *a ){
     return;
 }
 
+
 void
 free_graph(){
     _free_graph( top_left_finder_safe() ); //Go to the dummy row. This is kinda convoluted
 }
+
 
 //NOTE: It's probably better to build the first row of true atoms and
 //      Then create the dummy rows. Speed up will be proprotional to
@@ -768,8 +767,8 @@ calc_actual_width( struct atom *a ){
 */
     if(a->is_dummy) return; //Return early if this is a dummy atom. TODO: This isn't great fix it.
 
-    static char buf[4097]; 
-    
+    static char buf[4097];
+
     if( is(a->conversion_specifier, "c") ){
         if( is( a->length_modifier, "" ) ){
             a->type = C_INT;
@@ -783,7 +782,6 @@ calc_actual_width( struct atom *a ){
             cprintf_error("Error in calc_actual_width: Invalid length modifier for \%c", EXIT_FAILURE);
         }
     }
-
     else if (is(a->conversion_specifier, "s")) {
         if (is(a->length_modifier, "")) {
             a->type = C_CHARX;
@@ -804,22 +802,6 @@ calc_actual_width( struct atom *a ){
             cprintf_error("Error in calc_actual_width: Invalid length modifier for %s", EXIT_FAILURE);
         }
     }
-
-/*    else if( is(a->conversion_specifier, "s") ){
-        if( is( a->length_modifier, "" ) ){
-            a->type = C_CHARX;
-            a->val.c_charx = va_arg( *(a->pargs), char* );
-            snprintf( buf, 4096, a->original_specification, a->val.c_charx );
-        }else if( is( a->length_modifier, "l" ) ){
-            a->type = C_WCHAR_TX;
-            a->val.c_wchar_tx = va_arg( *(a->pargs), wchar_t* );
-            snprintf( buf, 4096, a->original_specification, a->val.c_wchar_tx );
-        }else{
-            cprintf_error("Error in calc_actual_width: Invalid length modifier for \%s", EXIT_FAILURE);
-        }
-    }
-*/
-
     else if( is(a->conversion_specifier, "d")
           ||  is(a->conversion_specifier, "i") ){
         if( is( a->length_modifier, "hh" )
@@ -1002,7 +984,7 @@ void generate_new_specs(){
 }
 
 
-void 
+void
 calculate_writeback(struct atom * a) {
     // Calculate writeback handles %n specifiers traversing right to left summing up the field widths
     // and then writing back the total to the pointer
@@ -1029,7 +1011,7 @@ void
 print_something_already(){
     // bunch of checks to see if Something horrible happened... No dummies.
     // TODO: make this use find_top_left_safe
-    if( NULL == state || NULL == state->origin || NULL == state->origin->up || 
+    if( NULL == state || NULL == state->origin || NULL == state->origin->up ||
         NULL == state->origin->down || NULL == state->bot_left) {
         cprintf_error("Warning in %s: Graph is not initialized.", __PRETTY_FUNCTION__);
     }
@@ -1095,7 +1077,7 @@ _cprintf( FILE *stream, const char *fmt, va_list *args ){
         cprintf_error("Error: Invalid args\n", EXIT_FAILURE);
     }
     /* There's a reasonable argument that newlines should be indicated by
-       '\n' in the ordinary text, which would allow successive calls to 
+       '\n' in the ordinary text, which would allow successive calls to
        cprintf() to populate a single line.  This raises, however, the
        question of what to do with cprintf("\n\n") and similar.  For now,
        keep parsing easy.
@@ -1229,6 +1211,4 @@ cflush(){
         free_graph();
         teardown();
     }
-
-    //state = NULL; //Think this is already done but can't hurt.
 }
