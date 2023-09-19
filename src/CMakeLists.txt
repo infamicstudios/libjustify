@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 11)
 
-option(BUILD_TESTS               "Build tests"                            ON)
+option(BUILD_TESTS               "Build tests"                            OFF)
 option(VERBOSE                   "Verbose output"                         OFF)
 
 
@@ -34,4 +34,13 @@ target_link_libraries(cprintf PUBLIC ${CMAKE_DL_LIBS})
 target_include_directories(cprintf PUBLIC ${CMAKE_SOURCE_DIR})
 
 set_target_properties(cprintf PROPERTIES
-                     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/libjustify/)
+                     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/)
+
+install(FILES "./cprintf.h"
+        DESTINATION include)
+
+install(TARGETS cprintf
+        EXPORT  cprintf
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION lib)
